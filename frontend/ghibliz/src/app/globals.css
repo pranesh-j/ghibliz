@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Ghibli theme colors as direct hex values */
+  --ghibli-blue: #5EBFE2;
+  --ghibli-green: #59A459;
+  --ghibli-cream: #FFF6C8;
+  --ghibli-dark: #5A4A3F;
+}
+
+/* Font family setup */
+.font-playfair {
+  font-family: var(--font-playfair), serif;
+}
+
+/* Custom Ghibli theme utility classes with direct values */
+.bg-ghibli-blue {
+  background-color: #5EBFE2;
+}
+
+.bg-ghibli-green {
+  background-color: #59A459;
+}
+
+.bg-ghibli-cream {
+  background-color: #FFF6C8;
+}
+
+.bg-ghibli-dark {
+  background-color: #5A4A3F;
+}
+
+.text-ghibli-blue {
+  color: #5EBFE2;
+}
+
+.text-ghibli-green {
+  color: #59A459;
+}
+
+.text-ghibli-cream {
+  color: #FFF6C8;
+}
+
+.text-ghibli-dark {
+  color: #5A4A3F;
+}
+
+/* Additional styling */
+.transform-title {
+  font-size: 5rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), serif;
+  color: #5A4A3F;
+}
