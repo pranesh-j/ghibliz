@@ -124,21 +124,25 @@ export default function Home() {
     const file = event.target.files?.[0]
     if (!file) return
     
-    // Check if user has used their free image and is not authenticated or doesn't have credits
-    if (hasUsedFreeImage && (!isAuthenticated || (user?.profile?.credit_balance && user.profile.credit_balance <= 0))) {
-      // Show promotion popup instead of preventing upload during testing
-      setShowPromoPopup(true)
+    // Only show restrictions for non-Google authenticated users
+    if (!isAuthenticated && hasUsedFreeImage) {
+      setLoginOpen(true)
       toast({
-        title: "Free image limit reached",
-        description: "But we're still in testing, so go ahead!",
+        title: "Login required",
+        description: "Please sign in with Google to continue using Ghibliz",
         variant: "info"
       })
-      // Continue with the upload process anyway for testing
+      
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+      return
     }
 
     // Reset states
     setProcessedImage(null)
     setImageData(null)
+    setShowPromoPopup(false) // Hide any existing popup
     
     // Display the selected image
     const reader = new FileReader()
@@ -155,13 +159,6 @@ export default function Home() {
     setIsProcessing(true)
     
     try {
-      // Check if user has credits if they're authenticated and have used their free transform
-      if (isAuthenticated && user?.profile?.free_transform_used && user?.profile?.credit_balance <= 0) {
-        // During testing, show promo popup but continue anyway
-        setShowPromoPopup(true)
-        // Continue processing anyway for testing purposes
-      }
-      
       // Call the API to transform the image
       const response = await ImageService.transformImage(file)
       
@@ -169,12 +166,15 @@ export default function Home() {
       setProcessedImage(response.preview_url || response.image_url)
       setImageData(response)
       
-      // Mark that user has used their free image and show popup
-      if (!hasUsedFreeImage) {
+      // Mark that user has used their free image if not authenticated
+      if (!isAuthenticated && !hasUsedFreeImage) {
         setHasUsedFreeImage(true)
-        setShowPromoPopup(true)
         localStorage.setItem('freeImageUsed', 'true')
       }
+      
+      // Show the promotion popup AFTER successful image creation
+      // Show popup for both authenticated and non-authenticated users
+      setShowPromoPopup(true)
       
       toast({
         title: "Transformation complete!",
@@ -188,7 +188,7 @@ export default function Home() {
       
       // Handle specific API errors
       if (error.response?.status === 402) {
-        errorMessage = "You need to purchase credits to transform more images."
+        errorMessage = "Please sign in with Google for unlimited transformations."
         setLoginOpen(true)
       } else if (error.response?.status === 413) {
         errorMessage = "Image size is too large. Please upload a smaller image."
@@ -208,6 +208,17 @@ export default function Home() {
 
   const handleDownload = async () => {
     if (!imageData) return
+    
+    // Require login to download
+    if (!isAuthenticated) {
+      setLoginOpen(true)
+      toast({
+        title: "Login required",
+        description: "Please sign in with Google to download your image",
+        variant: "info"
+      })
+      return
+    }
     
     try {
       // If paid image, download the full version, otherwise use preview
@@ -309,32 +320,37 @@ export default function Home() {
             <GhibliLogo />
 
             <div className="flex gap-2 sm:gap-3">
-              {isAuthenticated ? (
-                <div className="flex items-center gap-2">
-                  <div className="text-sm text-ghibli-dark mr-2">
-                    <span className="font-medium">{user?.username}</span>
-                    {user?.profile && (
-                      <div className="flex items-center gap-1">
-                        <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
-                          {user.profile.credit_balance} credits
-                        </span>
-                        <Button
-                          className="p-1 h-auto bg-transparent hover:bg-transparent text-amber-600"
-                          onClick={handleBuyCredits}
-                        >
-                          <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  <Button 
-                    className="bg-transparent text-ghibli-dark border border-ghibli-dark/70 hover:bg-ghibli-dark/5 transition-colors flex items-center text-sm sm:text-base px-2 sm:px-4 py-1 sm:py-2"
-                    onClick={logout}
-                  >
-                    Sign out
-                  </Button>
+            {isAuthenticated ? (
+              <div className="flex items-center gap-2">
+                <div className="text-sm text-ghibli-dark mr-2">
+                  <span className="font-medium">
+                    {/* Try different user properties in this order */}
+                    {user?.first_name 
+                      ? `${user.first_name} ${user.last_name || ''}` 
+                      : user?.email || user?.username}
+                  </span>
+                  {user?.profile && (
+                    <div className="flex items-center gap-1">
+                      <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
+                        {user.profile.credit_balance} credits
+                      </span>
+                      <Button
+                        className="p-1 h-auto bg-transparent hover:bg-transparent text-amber-600"
+                        onClick={handleBuyCredits}
+                      >
+                        <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              ) : (
+                <Button 
+                  className="bg-transparent text-ghibli-dark border border-ghibli-dark/70 hover:bg-ghibli-dark/5 transition-colors flex items-center text-sm sm:text-base px-2 sm:px-4 py-1 sm:py-2"
+                  onClick={logout}
+                >
+                  Sign out
+                </Button>
+              </div>
+            ) : (
                 <>
                   <Button 
                     className="bg-transparent text-ghibli-dark border border-ghibli-dark/70 hover:bg-ghibli-dark/5 transition-colors flex items-center text-sm sm:text-base px-2 sm:px-4 py-1 sm:py-2"
@@ -395,8 +411,17 @@ export default function Home() {
               <div className={`p-4 sm:p-6 bg-white/90 backdrop-blur-sm rounded-3xl border border-amber-100 shadow-xl max-w-3xl mx-auto ${isFullView ? 'pt-2 pb-2' : ''}`}>
                 {viewingImage ? (
                   // Full image viewer without any extras
-                  <div className="py-2">
+                  <div className="py-2 -mt-6 sm:-mt-8">
                     <div className="relative w-full flex justify-center">
+                      {/* Close button */}
+                      <button 
+                        onClick={handleCloseViewer}
+                        className="absolute top-2 right-2 z-10 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white"
+                        aria-label="Close viewer"
+                      >
+                        <X className="h-5 w-5 text-ghibli-dark" />
+                      </button>
+                      
                       <img
                         src={viewingImage === "original" ? selectedImage : processedImage || ""}
                         alt={viewingImage === "original" ? "Original" : "Ghiblified"}

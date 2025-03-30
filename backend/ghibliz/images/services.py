@@ -112,6 +112,7 @@ def transform_image_to_ghibli(image_file):
         raise Exception(f"Failed to create Ghibli-style image: {str(e)}")
 
 
+# Updated watermarking function with padding defined and simpler watermark
 def create_watermarked_preview(image_file):
     """
     Add a watermark to the image for preview purposes
@@ -143,20 +144,16 @@ def create_watermarked_preview(image_file):
             font = None
         
         # Watermark text
-        text = "Ghibliz Preview"
+        text = "Ghibliz"
         
-        # Add subtle watermarks in corners only
+        # Calculate padding - DEFINE THIS VARIABLE BEFORE USING IT
         padding = max(10, min(width, height) // 30)
-        positions = [
-            (padding, padding),  # Top left
-            (width - padding - len(text)*font_size//2, padding),  # Top right
-            (padding, height - padding - font_size),  # Bottom left
-            (width - padding - len(text)*font_size//2, height - padding - font_size)  # Bottom right
-        ]
         
-        # Draw watermarks with very low opacity
-        for pos in positions:
-            draw.text(pos, text, fill=(255, 255, 255, 75), font=font)
+        # Only add watermark to bottom right corner
+        position = (width - padding - len(text)*font_size//2, height - padding - font_size)
+        
+        # Draw watermark with low opacity
+        draw.text(position, text, fill=(255, 255, 255, 75), font=font)
         
         # Composite the image with the overlay
         watermarked = Image.alpha_composite(img, overlay)

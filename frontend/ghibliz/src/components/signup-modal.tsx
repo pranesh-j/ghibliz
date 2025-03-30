@@ -5,8 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 
 interface SignupModalProps {
   open: boolean
@@ -15,102 +13,16 @@ interface SignupModalProps {
 }
 
 export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModalProps) {
-  const { register, googleLogin, login, loading } = useAuth()
+  const { googleLogin, loading } = useAuth()
   const { toast } = useToast()
-  
-  const [username, setUsername] = useState("")
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setFieldErrors({})
-    
-    // Validate input
-    if (!username || !email || !password || !confirmPassword) {
-      setError("All fields are required")
-      return
-    }
-    
-    if (password !== confirmPassword) {
-      setFieldErrors({ ...fieldErrors, password2: "Passwords don't match" })
-      return
-    }
-    
-    try {
-      // Register user
-      await register({
-        username,
-        email,
-        password,
-        password2: confirmPassword
-      })
-      
-      // Login after successful registration
-      await login(username, password)
-      
-      toast({
-        title: "Account created",
-        description: "Welcome to Ghibliz!",
-        variant: "success"
-      })
-      
-      onOpenChange(false)
-      
-      // Clear form
-      setUsername("")
-      setEmail("")
-      setPassword("")
-      setConfirmPassword("")
-    } catch (err: any) {
-      console.error("Registration error:", err)
-      
-      // Handle field-specific errors
-      if (err.response?.data && typeof err.response.data === 'object') {
-        const errors: Record<string, string> = {}
-        
-        Object.entries(err.response.data).forEach(([key, value]) => {
-          if (Array.isArray(value)) {
-            errors[key] = value[0] as string
-          } else {
-            errors[key] = value as string
-          }
-        })
-        
-        setFieldErrors(errors)
-        
-        if (errors.non_field_errors) {
-          setError(errors.non_field_errors)
-        }
-      } else {
-        setError("Failed to create account. Please try again.")
-      }
-      
-      toast({
-        title: "Registration failed",
-        description: "Please check the form and try again",
-        variant: "error"
-      })
-    }
-  }
 
   const handleGoogleSignup = async () => {
     try {
       // In a production app, you'd use a proper OAuth flow like Google Identity Services
       // This is a simplified version that assumes your backend has Google OAuth integration
       
-      // 1. Initialize Google OAuth client
-      // const client = google.accounts.oauth2.initTokenClient({...})
-      
-      // 2. Get auth code
-      // const response = await client.requestAccessToken()
-      
-      // 3. Send token to backend
-      // For now, we'll simulate this with a mock token
+      setError(null)
       const mockGoogleToken = "google-mock-token"
       await googleLogin(mockGoogleToken)
       
@@ -148,86 +60,10 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
             </div>
           )}
 
-          <form onSubmit={handleRegister} className="space-y-4 mb-4">
-            <div className="space-y-2">
-              <Label htmlFor="signup-username">Username</Label>
-              <Input
-                id="signup-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Choose a username"
-                required
-                aria-invalid={fieldErrors.username ? "true" : "false"}
-              />
-              {fieldErrors.username && (
-                <p className="text-xs text-red-600">{fieldErrors.username}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="signup-email">Email</Label>
-              <Input
-                id="signup-email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="Enter your email"
-                required
-                aria-invalid={fieldErrors.email ? "true" : "false"}
-              />
-              {fieldErrors.email && (
-                <p className="text-xs text-red-600">{fieldErrors.email}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="signup-password">Password</Label>
-              <Input
-                id="signup-password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Create a password"
-                required
-                aria-invalid={fieldErrors.password ? "true" : "false"}
-              />
-              {fieldErrors.password && (
-                <p className="text-xs text-red-600">{fieldErrors.password}</p>
-              )}
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="signup-confirm-password">Confirm Password</Label>
-              <Input
-                id="signup-confirm-password"
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                required
-                aria-invalid={fieldErrors.password2 ? "true" : "false"}
-              />
-              {fieldErrors.password2 && (
-                <p className="text-xs text-red-600">{fieldErrors.password2}</p>
-              )}
-            </div>
-            
-            <Button 
-              type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2"
-              disabled={loading}
-            >
-              {loading ? "Creating account..." : "Create account"}
-            </Button>
-          </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-300"></span>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-amber-50 px-2 text-gray-500">Or continue with</span>
-            </div>
+          <div className="mb-4 text-center">
+            <p className="text-ghibli-dark mb-6">
+              Create your account with Google to get unlimited testing access to Ghibliz.
+            </p>
           </div>
 
           <Button
@@ -258,22 +94,8 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
                 />
               </svg>
             )}
-            Continue with Google
+            Sign up with Google
           </Button>
-
-          <div className="mt-6 text-center text-sm text-ghibli-dark/60">
-            Already have an account?{" "}
-            <button
-              className="text-blue-500 hover:underline"
-              onClick={() => {
-                onOpenChange(false)
-                onSwitchToLogin()
-              }}
-              type="button"
-            >
-              Sign in
-            </button>
-          </div>
         </div>
       </DialogContent>
     </Dialog>

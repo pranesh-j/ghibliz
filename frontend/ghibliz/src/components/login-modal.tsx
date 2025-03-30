@@ -5,8 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { GoogleLogin } from '@react-oauth/google'
 
 interface LoginModalProps {
   open: boolean
@@ -14,73 +13,20 @@ interface LoginModalProps {
   onSwitchToSignup: () => void
 }
 
-export function LoginModal({ open, onOpenChange, onSwitchToSignup }: LoginModalProps) {
-  const { login, googleLogin, loading } = useAuth()
+export function LoginModal({ open, onOpenChange }: LoginModalProps) {
+  const { googleLogin, loading } = useAuth()
   const { toast } = useToast()
-  
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    
-    if (!username || !password) {
-      setError("Username and password are required")
-      return
-    }
-    
+  const handleGoogleLoginSuccess = async (credentialResponse: any) => {
     try {
-      await login(username, password)
+      setError(null)
+      // Send the ID token to your backend
+      await googleLogin(credentialResponse.credential)
       
       toast({
         title: "Login successful",
-        description: "Welcome back to Ghibliz!",
-        variant: "success"
-      })
-      
-      onOpenChange(false)
-      
-      // Clear form
-      setUsername("")
-      setPassword("")
-    } catch (err: any) {
-      console.error("Login error:", err)
-      
-      setError(
-        err.response?.data?.detail || 
-        err.response?.data?.non_field_errors?.[0] || 
-        "Invalid username or password"
-      )
-      
-      toast({
-        title: "Login failed",
-        description: "Please check your credentials and try again",
-        variant: "error"
-      })
-    }
-  }
-
-  const handleGoogleLogin = async () => {
-    try {
-      // In a production app, you'd use a proper OAuth flow like Google Identity Services
-      // This is a simplified version that assumes your backend has Google OAuth integration
-      
-      // 1. Initialize Google OAuth client
-      // const client = google.accounts.oauth2.initTokenClient({...})
-      
-      // 2. Get auth code
-      // const response = await client.requestAccessToken()
-      
-      // 3. Send token to backend
-      // For now, we'll simulate this with a mock token
-      const mockGoogleToken = "google-mock-token"
-      await googleLogin(mockGoogleToken)
-      
-      toast({
-        title: "Login successful",
-        description: "Welcome back to Ghibliz!",
+        description: "Welcome to Ghibliz!",
         variant: "success"
       })
       
@@ -98,11 +44,21 @@ export function LoginModal({ open, onOpenChange, onSwitchToSignup }: LoginModalP
     }
   }
 
+  const handleGoogleLoginError = () => {
+    setError("Google sign-in was unsuccessful. Please try again.")
+    
+    toast({
+      title: "Login failed",
+      description: "Google authentication was canceled or failed",
+      variant: "error"
+    })
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-amber-50 border-none rounded-xl shadow-lg p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Welcome back</DialogTitle>
+          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Welcome to Ghibliz</DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
@@ -112,92 +68,37 @@ export function LoginModal({ open, onOpenChange, onSwitchToSignup }: LoginModalP
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-4 mb-4">
-            <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
-                required
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter your password"
-                required
-              />
-            </div>
-            
-            <Button 
-              type="submit"
-              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2"
-              disabled={loading}
-            >
-              {loading ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
-
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t border-gray-300"></span>
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-amber-50 px-2 text-gray-500">Or continue with</span>
-            </div>
+          <div className="mb-8 text-center">
+            <p className="text-ghibli-dark mb-2">
+              Sign in with your Google account to get unlimited access to Ghibliz.
+            </p>
+            <p className="text-xs text-ghibli-dark/70">
+              Google users get unlimited image transformations during our testing period!
+            </p>
           </div>
 
-          <Button
-            className="w-full border border-ghibli-dark/20 bg-white text-ghibli-dark hover:bg-ghibli-dark/5 px-4 py-2 rounded-md flex items-center justify-center"
-            onClick={handleGoogleLogin}
-            disabled={loading}
-            type="button"
-          >
+          <div className="flex justify-center mb-4">
             {loading ? (
-              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></span>
+              <Button disabled className="px-4 py-2 flex items-center justify-center">
+                <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></span>
+                Loading...
+              </Button>
             ) : (
-              <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
-                <path
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                  fill="#4285F4"
-                />
-                <path
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                  fill="#34A853"
-                />
-                <path
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                  fill="#FBBC05"
-                />
-                <path
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                  fill="#EA4335"
-                />
-              </svg>
+              <GoogleLogin
+                onSuccess={handleGoogleLoginSuccess}
+                onError={handleGoogleLoginError}
+                useOneTap
+                theme="outline"
+                size="large"
+                text="signin_with"
+                shape="rectangular"
+              />
             )}
-            Continue with Google
-          </Button>
-
-          <div className="mt-6 text-center text-sm text-ghibli-dark/60">
-            Don&apos;t have an account?{" "}
-            <button
-              className="text-blue-500 hover:underline"
-              onClick={() => {
-                onOpenChange(false)
-                onSwitchToSignup()
-              }}
-              type="button"
-            >
-              Sign up
-            </button>
           </div>
+          
+          <p className="text-xs text-center text-ghibli-dark/60 mt-4">
+            By signing in, you agree to our Terms of Service and Privacy Policy
+          </p>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,11 +1,12 @@
-// src/app/layout.tsx
+"use client"
+
 import type { ReactNode } from "react"
-import type { Metadata } from "next"
 import { Playfair_Display, Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from "@/contexts/AuthContext"
 import { ToastProvider } from "@/components/ui/toast"
+import { GoogleOAuthProvider } from '@react-oauth/google'
 
 const inter = Inter({ 
   subsets: ["latin"],
@@ -19,26 +20,28 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: "Ghibliz - Transform Photos into Studio Ghibli Art",
-  description: "Transform your photos into beautiful Studio Ghibli-inspired artwork with AI",
-}
+// Metadata is now in a separate metadata.ts file
 
 export default function RootLayout({
   children,
 }: {
   children: ReactNode
 }) {
+  // Get Google Client ID from environment variable
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  
   return (
     <html lang="en">
       <body className={`${inter.className} ${playfair.variable}`}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          <AuthProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </AuthProvider>
-        </ThemeProvider>
+        <GoogleOAuthProvider clientId={googleClientId}>
+          <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+            <AuthProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </AuthProvider>
+          </ThemeProvider>
+        </GoogleOAuthProvider>
       </body>
     </html>
   )

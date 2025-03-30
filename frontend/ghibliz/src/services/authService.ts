@@ -21,37 +21,10 @@ export interface LoginResponse {
   refresh: string;
 }
 
-export interface RegisterData {
-  username: string;
-  email: string;
-  password: string;
-  password2: string;
-  first_name?: string;
-  last_name?: string;
-}
-
-const AuthService = {
-  // Login user with username and password
-  login: async (username: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/token/', { username, password });
-    
-    // Store tokens
-    const { access, refresh } = response.data;
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    
-    return response.data;
-  },
-  
-  // Register a new user
-  register: async (data: RegisterData): Promise<User> => {
-    const response = await api.post<User>('/register/', data);
-    return response.data;
-  },
-  
+const AuthService = {  
   // Google OAuth login
-  googleLogin: async (token: string): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/google-login/', { token });
+  googleLogin: async (idToken: string): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/google-login/', { id_token: idToken });
     
     // Store tokens
     const { access, refresh } = response.data;

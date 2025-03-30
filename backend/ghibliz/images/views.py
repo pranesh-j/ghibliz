@@ -39,8 +39,7 @@ class ImageTransformAPIView(views.APIView):
             # Check if user has credits or has not used free transform
             user_profile = UserProfile.objects.get(user=user)
             
-            if not user_profile.free_transform_used and user_profile.credit_balance == 0:
-                # First free transform
+            if not user_profile.free_transform_used:
                 user_profile.free_transform_used = True
                 user_profile.save()
             elif user_profile.credit_balance > 0:
