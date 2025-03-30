@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { motion } from "framer-motion"
-import { Upload, Download, Share2, Loader2, LogIn, UserPlus, ArrowRight, RefreshCw, CreditCard } from "lucide-react"
+import { Upload, Download, Share2, Loader2, LogIn, UserPlus, ArrowRight, RefreshCw, CreditCard, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CloudBackground } from "@/components/cloud-background"
 import { LoginModal } from "@/components/login-modal"
@@ -24,6 +24,7 @@ export default function Home() {
   const [recentWorks, setRecentWorks] = useState<RecentImage[]>([])
   const [loadingRecentWorks, setLoadingRecentWorks] = useState(false)
   const [imageData, setImageData] = useState<any>(null)
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch recent works on component mount
@@ -151,6 +152,16 @@ export default function Home() {
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleImagePreview = () => {
+    if (processedImage) {
+      setPreviewImage(processedImage);
+    }
+  }
+
+  const handleClosePreview = () => {
+    setPreviewImage(null);
   }
 
   const handleDownload = async () => {
@@ -352,11 +363,13 @@ export default function Home() {
                   {/* Original Image */}
                   <div>
                     <p className="text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-gray-600">Original</p>
-                    <div className="rounded-2xl overflow-hidden bg-gray-100 aspect-[4/3]">
+                    <div className="rounded-2xl overflow-hidden bg-gray-800 aspect-[4/3]">
                       <img
                         src={selectedImage}
                         alt="Original"
                         className="w-full h-full object-cover"
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => setPreviewImage(selectedImage)}
                       />
                     </div>
                   </div>
@@ -364,21 +377,25 @@ export default function Home() {
                   {/* Processed Image */}
                   <div>
                     <p className="text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-gray-600">Ghiblified</p>
-                    <div className="rounded-2xl overflow-hidden bg-gray-100 aspect-[4/3]">
+                    <div className="rounded-2xl overflow-hidden bg-gray-800 aspect-[4/3]">
                       {isProcessing ? (
                         <div className="w-full h-full flex items-center justify-center">
                           <div className="text-center">
                             <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500 animate-spin mx-auto mb-2 sm:mb-3" />
-                            <p className="text-xs sm:text-sm text-gray-600">Creating magic...</p>
+                            <p className="text-xs sm:text-sm text-gray-300">Creating magic...</p>
                           </div>
                         </div>
                       ) : (
                         processedImage && (
-                          <img
-                            src={processedImage}
-                            alt="Processed"
-                            className="w-full h-full object-cover"
-                          />
+                          <div className="w-full h-full">
+                            <img
+                              src={processedImage}
+                              alt="Processed"
+                              className="w-full h-full object-cover" 
+                              style={{ cursor: 'pointer' }}
+                              onClick={handleImagePreview}
+                            />
+                          </div>
                         )
                       )}
                     </div>
@@ -514,6 +531,28 @@ export default function Home() {
           onOpenChange={setSignupOpen} 
           onSwitchToLogin={handleSwitchToLogin} 
         />
+        
+        {/* Image Preview Modal */}
+        {previewImage && (
+          <div 
+            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+            onClick={handleClosePreview}
+          >
+            <div className="relative max-w-4xl max-h-[90vh]">
+              <img 
+                src={previewImage} 
+                alt="Preview" 
+                className="max-w-full max-h-[90vh] object-contain"
+              />
+              <button 
+                className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-1"
+                onClick={handleClosePreview}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   )
