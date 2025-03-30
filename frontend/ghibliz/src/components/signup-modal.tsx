@@ -1,18 +1,137 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
+import { useAuth } from "@/contexts/AuthContext"
+import { useToast } from "@/components/ui/toast"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 interface SignupModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSwitchToLogin: () => void
 }
 
-export function SignupModal({ open, onOpenChange }: SignupModalProps) {
-  const handleGoogleSignup = () => {
-    // Handle Google signup logic here
-    console.log("Signup with Google")
-    onOpenChange(false)
+export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModalProps) {
+  const { register, googleLogin, login, loading } = useAuth()
+  const { toast } = useToast()
+  
+  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setFieldErrors({})
+    
+    // Validate input
+    if (!username || !email || !password || !confirmPassword) {
+      setError("All fields are required")
+      return
+    }
+    
+    if (password !== confirmPassword) {
+      setFieldErrors({ ...fieldErrors, password2: "Passwords don't match" })
+      return
+    }
+    
+    try {
+      // Register user
+      await register({
+        username,
+        email,
+        password,
+        password2: confirmPassword
+      })
+      
+      // Login after successful registration
+      await login(username, password)
+      
+      toast({
+        title: "Account created",
+        description: "Welcome to Ghibliz!",
+        variant: "success"
+      })
+      
+      onOpenChange(false)
+      
+      // Clear form
+      setUsername("")
+      setEmail("")
+      setPassword("")
+      setConfirmPassword("")
+    } catch (err: any) {
+      console.error("Registration error:", err)
+      
+      // Handle field-specific errors
+      if (err.response?.data && typeof err.response.data === 'object') {
+        const errors: Record<string, string> = {}
+        
+        Object.entries(err.response.data).forEach(([key, value]) => {
+          if (Array.isArray(value)) {
+            errors[key] = value[0] as string
+          } else {
+            errors[key] = value as string
+          }
+        })
+        
+        setFieldErrors(errors)
+        
+        if (errors.non_field_errors) {
+          setError(errors.non_field_errors)
+        }
+      } else {
+        setError("Failed to create account. Please try again.")
+      }
+      
+      toast({
+        title: "Registration failed",
+        description: "Please check the form and try again",
+        variant: "error"
+      })
+    }
+  }
+
+  const handleGoogleSignup = async () => {
+    try {
+      // In a production app, you'd use a proper OAuth flow like Google Identity Services
+      // This is a simplified version that assumes your backend has Google OAuth integration
+      
+      // 1. Initialize Google OAuth client
+      // const client = google.accounts.oauth2.initTokenClient({...})
+      
+      // 2. Get auth code
+      // const response = await client.requestAccessToken()
+      
+      // 3. Send token to backend
+      // For now, we'll simulate this with a mock token
+      const mockGoogleToken = "google-mock-token"
+      await googleLogin(mockGoogleToken)
+      
+      toast({
+        title: "Account created",
+        description: "Welcome to Ghibliz!",
+        variant: "success"
+      })
+      
+      onOpenChange(false)
+    } catch (err) {
+      console.error("Google signup error:", err)
+      
+      setError("Failed to signup with Google. Please try again.")
+      
+      toast({
+        title: "Signup failed",
+        description: "There was a problem creating your account with Google",
+        variant: "error"
+      })
+    }
   }
 
   return (
@@ -23,11 +142,103 @@ export function SignupModal({ open, onOpenChange }: SignupModalProps) {
         </DialogHeader>
 
         <div className="py-4">
-          <div className="mt-4">
-            <Button
-              className="w-full border border-ghibli-dark/20 bg-white text-ghibli-dark hover:bg-ghibli-dark/5 px-4 py-2 rounded-md flex items-center justify-center"
-              onClick={handleGoogleSignup}
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="space-y-4 mb-4">
+            <div className="space-y-2">
+              <Label htmlFor="signup-username">Username</Label>
+              <Input
+                id="signup-username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Choose a username"
+                required
+                aria-invalid={fieldErrors.username ? "true" : "false"}
+              />
+              {fieldErrors.username && (
+                <p className="text-xs text-red-600">{fieldErrors.username}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="signup-email">Email</Label>
+              <Input
+                id="signup-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                aria-invalid={fieldErrors.email ? "true" : "false"}
+              />
+              {fieldErrors.email && (
+                <p className="text-xs text-red-600">{fieldErrors.email}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="signup-password">Password</Label>
+              <Input
+                id="signup-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Create a password"
+                required
+                aria-invalid={fieldErrors.password ? "true" : "false"}
+              />
+              {fieldErrors.password && (
+                <p className="text-xs text-red-600">{fieldErrors.password}</p>
+              )}
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+              <Input
+                id="signup-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Confirm your password"
+                required
+                aria-invalid={fieldErrors.password2 ? "true" : "false"}
+              />
+              {fieldErrors.password2 && (
+                <p className="text-xs text-red-600">{fieldErrors.password2}</p>
+              )}
+            </div>
+            
+            <Button 
+              type="submit"
+              className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2"
+              disabled={loading}
             >
+              {loading ? "Creating account..." : "Create account"}
+            </Button>
+          </form>
+
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-gray-300"></span>
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-amber-50 px-2 text-gray-500">Or continue with</span>
+            </div>
+          </div>
+
+          <Button
+            className="w-full border border-ghibli-dark/20 bg-white text-ghibli-dark hover:bg-ghibli-dark/5 px-4 py-2 rounded-md flex items-center justify-center"
+            onClick={handleGoogleSignup}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? (
+              <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></span>
+            ) : (
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -46,9 +257,9 @@ export function SignupModal({ open, onOpenChange }: SignupModalProps) {
                   fill="#EA4335"
                 />
               </svg>
-              Continue with Google
-            </Button>
-          </div>
+            )}
+            Continue with Google
+          </Button>
 
           <div className="mt-6 text-center text-sm text-ghibli-dark/60">
             Already have an account?{" "}
@@ -56,8 +267,9 @@ export function SignupModal({ open, onOpenChange }: SignupModalProps) {
               className="text-blue-500 hover:underline"
               onClick={() => {
                 onOpenChange(false)
-                // Open login modal logic here
+                onSwitchToLogin()
               }}
+              type="button"
             >
               Sign in
             </button>

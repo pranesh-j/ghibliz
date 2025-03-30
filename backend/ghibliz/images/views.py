@@ -1,6 +1,8 @@
 # images/views.py
 from rest_framework import status, views, permissions
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 from django.core.files.base import ContentFile
 from .serializers import GeneratedImageSerializer, ImageUploadSerializer
 from .models import GeneratedImage
@@ -8,6 +10,7 @@ from .services import transform_image_to_ghibli, create_watermarked_preview
 from users.models import UserProfile
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
 
 class ImageTransformAPIView(views.APIView):
     permission_classes = [permissions.AllowAny]  # Allow anonymous for first free transform
@@ -102,3 +105,27 @@ class ImageTransformAPIView(views.APIView):
                 {"error": "Failed to transform image. Please try again later."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def recent_images(request):
+    """Get recent public transformed images"""
+    limit = int(request.query_params.get('limit', 6))
+    
+    # Get recent images
+    images = GeneratedImage.objects.order_by('-created_at')[:limit]
+    
+    # Format the response
+    result = []
+    for img in images:
+        # Use actual image URLs if available, otherwise use placeholders
+        original_url = request.build_absolute_uri(img.preview_image.url) if img.preview_image else "/api/placeholder/400/300"
+        processed_url = request.build_absolute_uri(img.image.url) if img.image else "/api/placeholder/400/300"
+        
+        result.append({
+            'id': img.id,
+            'original': original_url,
+            'processed': processed_url,
+        })
+    
+    return Response(result)
