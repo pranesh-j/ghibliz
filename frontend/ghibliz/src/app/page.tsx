@@ -24,8 +24,28 @@ export default function Home() {
   const [recentWorks, setRecentWorks] = useState<RecentImage[]>([])
   const [loadingRecentWorks, setLoadingRecentWorks] = useState(false)
   const [imageData, setImageData] = useState<any>(null)
-  const [previewImage, setPreviewImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [hasUsedFreeImage, setHasUsedFreeImage] = useState(false)
+  const [showPromoPopup, setShowPromoPopup] = useState(false)
+  
+  // Image viewing state
+  const [viewingImage, setViewingImage] = useState<"original" | "processed" | null>(null)
+  const [isFullView, setIsFullView] = useState(false)
+
+  // Used for managing sizing of the generated image
+  const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    if (viewingImage === "processed" && selectedImage && e.currentTarget) {
+      const originalImg = new Image();
+      originalImg.onload = () => {
+        // Match dimensions of original image
+        const aspectRatio = originalImg.width / originalImg.height;
+        const newHeight = e.currentTarget.clientHeight || 400;
+        const newWidth = newHeight * aspectRatio;
+        e.currentTarget.style.width = `${newWidth}px`;
+      };
+      originalImg.src = selectedImage;
+    }
+  };
 
   // Fetch recent works on component mount
   useEffect(() => {
@@ -83,9 +103,38 @@ export default function Home() {
     fetchRecentWorks()
   }, [toast])
 
+  // Check if user has already used their free image
+  useEffect(() => {
+    // Check localStorage for free image usage
+    const freeImageUsed = localStorage.getItem('freeImageUsed') === 'true'
+    setHasUsedFreeImage(freeImageUsed)
+  }, [])
+  
+  const handleViewImage = (type: "original" | "processed") => {
+    setViewingImage(type);
+    setIsFullView(true);
+  }
+  
+  const handleCloseViewer = () => {
+    setViewingImage(null);
+    setIsFullView(false);
+  }
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
+    
+    // Check if user has used their free image and is not authenticated or doesn't have credits
+    if (hasUsedFreeImage && (!isAuthenticated || (user?.profile?.credit_balance && user.profile.credit_balance <= 0))) {
+      // Show promotion popup instead of preventing upload during testing
+      setShowPromoPopup(true)
+      toast({
+        title: "Free image limit reached",
+        description: "But we're still in testing, so go ahead!",
+        variant: "info"
+      })
+      // Continue with the upload process anyway for testing
+    }
 
     // Reset states
     setProcessedImage(null)
@@ -108,13 +157,9 @@ export default function Home() {
     try {
       // Check if user has credits if they're authenticated and have used their free transform
       if (isAuthenticated && user?.profile?.free_transform_used && user?.profile?.credit_balance <= 0) {
-        toast({
-          title: "No credits available",
-          description: "Please purchase credits to continue transforming images",
-          variant: "warning"
-        })
-        setIsProcessing(false)
-        return
+        // During testing, show promo popup but continue anyway
+        setShowPromoPopup(true)
+        // Continue processing anyway for testing purposes
       }
       
       // Call the API to transform the image
@@ -123,6 +168,13 @@ export default function Home() {
       // Set the processed image URL and data
       setProcessedImage(response.preview_url || response.image_url)
       setImageData(response)
+      
+      // Mark that user has used their free image and show popup
+      if (!hasUsedFreeImage) {
+        setHasUsedFreeImage(true)
+        setShowPromoPopup(true)
+        localStorage.setItem('freeImageUsed', 'true')
+      }
       
       toast({
         title: "Transformation complete!",
@@ -152,16 +204,6 @@ export default function Home() {
     } finally {
       setIsProcessing(false)
     }
-  }
-
-  const handleImagePreview = () => {
-    if (processedImage) {
-      setPreviewImage(processedImage);
-    }
-  }
-
-  const handleClosePreview = () => {
-    setPreviewImage(null);
   }
 
   const handleDownload = async () => {
@@ -224,6 +266,8 @@ export default function Home() {
     setSelectedImage(null)
     setProcessedImage(null)
     setImageData(null)
+    setViewingImage(null)
+    setIsFullView(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ""
     }
@@ -247,6 +291,8 @@ export default function Home() {
       description: "Credit purchases will be available soon!",
       variant: "info"
     })
+    // Close the promo popup to avoid having both messages visible
+    setShowPromoPopup(false)
   }
 
   return (
@@ -273,7 +319,7 @@ export default function Home() {
                           {user.profile.credit_balance} credits
                         </span>
                         <Button
-                          className="p-1 h-auto bg-transparent hover:bg-transparent text-blue-500"
+                          className="p-1 h-auto bg-transparent hover:bg-transparent text-amber-600"
                           onClick={handleBuyCredits}
                         >
                           <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -315,16 +361,15 @@ export default function Home() {
         {/* Hero Section - More compact */}
         <section className="pt-3 sm:pt-8 pb-8 sm:pb-16 px-3 sm:px-8">
           <div className="max-w-4xl mx-auto text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-6xl font-playfair text-ghibli-dark mb-1 sm:mb-3 leading-tight">
-              Turn photos into Ghibli art
-            </h1>
-            <p className="text-sm sm:text-lg font-playfair text-ghibli-dark/80 mb-4 sm:mb-8 px-2">
-              AI-powered tool to transform ordinary photos into Studio Ghibli style artwork
-            </p>
+            {!isFullView && (
+              <h1 className="text-3xl sm:text-4xl md:text-6xl font-playfair text-ghibli-dark mb-1 sm:mb-3 leading-tight">
+                Turn photos into Ghibli art
+              </h1>
+            )}
 
             {/* Upload/Processing Area - More compact */}
             {!selectedImage ? (
-              <div className="p-4 sm:p-6 md:p-10 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl max-w-3xl mx-auto mt-2 sm:mt-4">
+              <div className="p-6 sm:p-8 md:p-14 bg-white/90 backdrop-blur-sm rounded-3xl border border-amber-100 shadow-xl max-w-3xl mx-auto mt-4 sm:mt-8 mb-8 sm:mb-12">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -335,91 +380,133 @@ export default function Home() {
                 />
                 <label
                   htmlFor="image-upload"
-                  className="cursor-pointer block border-2 border-dashed border-blue-300 rounded-2xl p-4 sm:p-8 text-center hover:border-blue-400 transition-colors"
+                  className="cursor-pointer block border-2 border-dashed border-amber-200 rounded-2xl p-6 sm:p-10 text-center hover:border-amber-300 transition-colors"
                 >
                   <div className="flex flex-col items-center">
-                    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-100 flex items-center justify-center mb-3 sm:mb-4">
-                      <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-blue-500" />
+                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-amber-50 flex items-center justify-center mb-4 sm:mb-6">
+                      <Upload className="w-8 h-8 sm:w-10 sm:h-10 text-amber-600" />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-playfair text-gray-800 mb-1 sm:mb-2">Begin your artistic journey</h3>
-                    <p className="text-xs sm:text-sm text-gray-600">Upload JPG or PNG images</p>
+                    <h3 className="text-xl sm:text-2xl font-playfair text-ghibli-dark mb-2 sm:mb-3">Begin your artistic journey</h3>
+                    <p className="text-sm sm:text-base text-ghibli-dark/70">Upload JPG or PNG images</p>
                   </div>
                 </label>
               </div>
             ) : (
-              <div className="p-4 sm:p-6 bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl max-w-3xl mx-auto">
-                <div className="flex justify-between items-center mb-3 sm:mb-4">
-                  <h3 className="text-lg sm:text-xl font-playfair text-gray-800">Your transformation</h3>
-                  <button
-                    onClick={handleReset}
-                    className="text-gray-600 hover:text-gray-800 px-2 py-1 rounded flex items-center text-xs sm:text-sm"
-                  >
-                    <RefreshCw className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                    New image
-                  </button>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
-                  {/* Original Image */}
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-gray-600">Original</p>
-                    <div className="rounded-2xl overflow-hidden bg-gray-800 aspect-[4/3]">
+              <div className={`p-4 sm:p-6 bg-white/90 backdrop-blur-sm rounded-3xl border border-amber-100 shadow-xl max-w-3xl mx-auto ${isFullView ? 'pt-2 pb-2' : ''}`}>
+                {viewingImage ? (
+                  // Full image viewer without any extras
+                  <div className="py-2">
+                    <div className="relative w-full flex justify-center">
                       <img
-                        src={selectedImage}
-                        alt="Original"
-                        className="w-full h-full object-cover"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => setPreviewImage(selectedImage)}
+                        src={viewingImage === "original" ? selectedImage : processedImage || ""}
+                        alt={viewingImage === "original" ? "Original" : "Ghiblified"}
+                        className="w-auto max-h-[70vh] object-contain"
+                        style={{
+                          background: 'white',
+                          borderRadius: '8px'
+                        }}
+                        onLoad={handleImageLoad}
                       />
                     </div>
-                  </div>
-
-                  {/* Processed Image */}
-                  <div>
-                    <p className="text-xs sm:text-sm font-medium mb-1 sm:mb-2 text-gray-600">Ghiblified</p>
-                    <div className="rounded-2xl overflow-hidden bg-gray-800 aspect-[4/3]">
-                      {isProcessing ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div className="text-center">
-                            <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-blue-500 animate-spin mx-auto mb-2 sm:mb-3" />
-                            <p className="text-xs sm:text-sm text-gray-300">Creating magic...</p>
-                          </div>
-                        </div>
-                      ) : (
-                        processedImage && (
-                          <div className="w-full h-full">
-                            <img
-                              src={processedImage}
-                              alt="Processed"
-                              className="w-full h-full object-cover" 
-                              style={{ cursor: 'pointer' }}
-                              onClick={handleImagePreview}
-                            />
-                          </div>
-                        )
-                      )}
+                    
+                    <div className="flex justify-center gap-3 sm:gap-5 mt-4">
+                      <button 
+                        className="bg-amber-500 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-amber-600 transition-colors text-sm font-medium min-w-[110px]"
+                        onClick={handleDownload}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </button>
+                      <button 
+                        className="bg-amber-50 text-ghibli-dark px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-amber-100 transition-colors text-sm font-medium min-w-[110px] border border-amber-200"
+                        onClick={handleShare}
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
+                      </button>
+                      <button 
+                        className="bg-white text-ghibli-dark px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-gray-50 transition-colors text-sm font-medium min-w-[110px] border border-gray-200"
+                        onClick={handleReset}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        New image
+                      </button>
                     </div>
                   </div>
-                </div>
+                ) : (
+                <div>
+                  <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
+                    {/* Original Image */}
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium text-ghibli-dark mb-1 sm:mb-2 text-center">Original</p>
+                      <div 
+                        className="rounded-lg overflow-hidden bg-white aspect-[4/3] border-2 border-amber-100 hover:border-amber-200 transition-all cursor-pointer"
+                        onClick={() => handleViewImage("original")}
+                      >
+                        <img
+                          src={selectedImage}
+                          alt="Original"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    </div>
 
-                {/* Action Buttons */}
-                {processedImage && !isProcessing && (
-                  <div className="flex justify-center gap-3 sm:gap-4 mt-4 sm:mt-6">
-                    <button 
-                      className="bg-blue-500 text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-md flex items-center hover:bg-blue-600 transition-colors text-sm"
-                      onClick={handleDownload}
-                    >
-                      <Download className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      Download
-                    </button>
-                    <button 
-                      className="border border-blue-500 text-blue-500 px-3 sm:px-4 py-1.5 sm:py-2 rounded-md flex items-center hover:bg-blue-50 transition-colors text-sm"
-                      onClick={handleShare}
-                    >
-                      <Share2 className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
-                      Share
-                    </button>
+                    {/* Processed Image */}
+                    <div>
+                      <p className="text-xs sm:text-sm font-medium text-ghibli-dark mb-1 sm:mb-2 text-center">Ghiblified</p>
+                      <div className="rounded-lg overflow-hidden bg-white aspect-[4/3] border-2 border-amber-100">
+                        {isProcessing ? (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <div className="text-center">
+                              <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-amber-500 animate-spin mx-auto mb-2 sm:mb-3" />
+                              <p className="text-xs sm:text-sm text-ghibli-dark/70">Creating magic...</p>
+                            </div>
+                          </div>
+                        ) : (
+                          processedImage && (
+                            <div 
+                              className="w-full h-full relative group cursor-pointer"
+                              onClick={() => handleViewImage("processed")}
+                            >
+                              <img
+                                src={processedImage}
+                                alt="Processed"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
                   </div>
+
+                  {/* Action Buttons */}
+                  {processedImage && !isProcessing && (
+                    <div className="flex justify-center gap-3 sm:gap-5 mt-4 sm:mt-6">
+                      <button 
+                        className="bg-amber-500 text-white px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-amber-600 transition-colors text-sm font-medium min-w-[110px]"
+                        onClick={handleDownload}
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
+                      </button>
+                      <button 
+                        className="bg-amber-50 text-ghibli-dark px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-amber-100 transition-colors text-sm font-medium min-w-[110px] border border-amber-200"
+                        onClick={handleShare}
+                      >
+                        <Share2 className="mr-2 h-4 w-4" />
+                        Share
+                      </button>
+                      <button 
+                        className="bg-white text-ghibli-dark px-5 sm:px-6 py-2 sm:py-2.5 rounded-md flex items-center justify-center hover:bg-gray-50 transition-colors text-sm font-medium min-w-[110px] border border-gray-200"
+                        onClick={handleReset}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        New image
+                      </button>
+                    </div>
+                  )}
+                </div>
                 )}
               </div>
             )}
@@ -427,9 +514,9 @@ export default function Home() {
         </section>
 
         {/* Recent Creations Section - with scrolling gallery */}
-        <section className="py-6 sm:py-10 px-3 sm:px-8 bg-amber-50/70">
+        <section className="py-4 sm:py-6 px-3 sm:px-8 bg-amber-50/70">
           <div className="max-w-7xl mx-auto">
-            <h2 className="text-xl sm:text-2xl font-playfair text-ghibli-dark text-center mb-4 sm:mb-8">Recent Creations</h2>
+            <h2 className="text-xl sm:text-2xl font-playfair text-ghibli-dark text-center mb-3 sm:mb-5">Recent Creations</h2>
 
             {loadingRecentWorks ? (
               <div className="flex justify-center items-center py-20">
@@ -520,6 +607,26 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Promotion Popup */}
+        {showPromoPopup && (
+          <div className="fixed bottom-4 right-4 bg-white/95 backdrop-blur-sm shadow-lg rounded-lg p-4 max-w-xs animate-fade-in-up z-50 border border-amber-200">
+            <button 
+              onClick={() => setShowPromoPopup(false)}
+              className="absolute top-2 right-2 text-gray-500 hover:text-gray-700"
+            >
+              <X size={16} />
+            </button>
+            <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT 20$ when you can do it for 1$?</p>
+            <p className="text-xs text-ghibli-dark/70 mb-3">Get 10 transforms for just $1!</p>
+            <button 
+              onClick={handleBuyCredits}
+              className="w-full bg-amber-500 text-white py-2 rounded text-sm hover:bg-amber-600 transition-colors"
+            >
+              Buy Credits
+            </button>
+          </div>
+        )}
+
         {/* Modals */}
         <LoginModal 
           open={loginOpen} 
@@ -531,28 +638,6 @@ export default function Home() {
           onOpenChange={setSignupOpen} 
           onSwitchToLogin={handleSwitchToLogin} 
         />
-        
-        {/* Image Preview Modal */}
-        {previewImage && (
-          <div 
-            className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-            onClick={handleClosePreview}
-          >
-            <div className="relative max-w-4xl max-h-[90vh]">
-              <img 
-                src={previewImage} 
-                alt="Preview" 
-                className="max-w-full max-h-[90vh] object-contain"
-              />
-              <button 
-                className="absolute top-2 right-2 text-white bg-black/50 rounded-full p-1"
-                onClick={handleClosePreview}
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </main>
   )
