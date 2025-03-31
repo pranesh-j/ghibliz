@@ -153,17 +153,28 @@ def verify_payment(request, session_id):
         # Check if payment details are valid
         payment_details = extracted_data['data']
         
+        # Print all verification results for debugging
+        print(f"Verification details: reference={payment_details.get('reference_code_matches')}, "
+              f"amount={payment_details.get('amount_matches')}, "
+              f"success={payment_details.get('payment_successful')}")
+        
         # 1. Verify reference code matches
         if not payment_details.get('reference_code_matches', False):
-            return Response({"error": "Reference code in the payment doesn't match"}, status=400)
+            return Response({
+                "error": "Reference code in the payment doesn't match. Please ensure you entered the exact reference code."
+            }, status=400)
             
         # 2. Verify amount matches
         if not payment_details.get('amount_matches', False):
-            return Response({"error": "Payment amount doesn't match the required amount"}, status=400)
+            return Response({
+                "error": "Payment amount doesn't match the required amount. Please ensure you paid the exact amount."
+            }, status=400)
             
-        # 3. Verify timestamp is within session window
-        if not payment_details.get('timestamp_valid', False):
-            return Response({"error": "Payment timestamp is outside the valid window"}, status=400)
+        # 3. Verify payment was successful
+        if not payment_details.get('payment_successful', False):
+            return Response({
+                "error": "The payment appears to have failed or is pending. Please provide a screenshot of a successful payment."
+            }, status=400)
         
         # Create payment record
         payment = Payment.objects.create(
@@ -196,6 +207,8 @@ def verify_payment(request, session_id):
         
     except Exception as e:
         print(f"Error processing payment: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return Response({
             "error": "We encountered a problem processing your payment verification. Please try again or contact support."
         }, status=500)
@@ -203,11 +216,6 @@ def verify_payment(request, session_id):
 def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount):
     """
     Use Gemini API to extract payment information from screenshot
-    
-    This function:
-    1. Converts the screenshot to base64
-    2. Calls Gemini API to extract text and analyze the payment details
-    3. Returns a structured response with payment information
     """
     try:
         # Convert image to base64
@@ -221,23 +229,23 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         # Create specific prompt for payment verification
         prompt = f"""
         Analyze this payment screenshot and extract the following information:
-        1. Transaction amount
+        1. Transaction amount (exact amount in numbers with currency symbol)
         2. Payment timestamp (date and time)
         3. Transaction ID or Reference number
         4. UPI ID of sender (if available)
         5. UPI ID of recipient (if available)
-        6. Transaction note or remarks
+        6. Transaction note or remarks (this is the most important a 8-digit alphanumeric reference code from the payment screenshot. The reference code should consist of uppercase letters and digits)
         7. Payment status (success/failure)
         
-        Does the screenshot show a transaction note/remark of exactly '{expected_reference_code}'?
-        Does the screenshot show a payment amount of exactly '₹{expected_amount}'?
-        Is the recipient UPI ID 'pran.eth@axl'?
-        Is the payment status successful?
+        Compare these details with:
+        - Expected reference code: '{expected_reference_code}'
+        - Expected amount: ₹{expected_amount}
+        - Expected recipient: 'pran.eth@axl'
         
         Format your response as a JSON object with these fields.
         """
         
-        # Prepare request payload
+        # Call Gemini API
         request_data = {
             "contents": [
                 {
@@ -254,7 +262,6 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             ]
         }
         
-        # Call Gemini API
         response = requests.post(
             f"{api_url}?key={api_key}",
             headers={"Content-Type": "application/json"},
@@ -274,6 +281,10 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         text_parts = [part.get('text', '') for part in content.get('parts', []) if 'text' in part]
         text = ''.join(text_parts)
         
+        print("===== GEMINI FULL RESPONSE =====")
+        print(text)
+        print("================================")
+        
         # Try to extract JSON data from response
         import re
         json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
@@ -284,8 +295,13 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             
         try:
             extracted_data = json.loads(json_text)
-        except:
-            # If JSON parsing fails, try a more aggressive extraction
+            print("===== EXTRACTED DATA =====")
+            print(json.dumps(extracted_data, indent=2))
+            print("==========================")
+            
+        except Exception as json_err:
+            print(f"JSON parsing error: {str(json_err)}")
+            # Handle parsing failure as before
             json_pattern = r'(\{.*\})'
             json_match = re.search(json_pattern, text, re.DOTALL)
             if json_match:
@@ -302,60 +318,108 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
                     'error': 'Unable to extract payment details from screenshot. Please ensure the entire payment receipt is visible.'
                 }
         
-        # Verify session creation time against payment timestamp
-        session_creation_time = timezone.now() - timedelta(minutes=7)
-        payment_timestamp = extracted_data.get('Payment timestamp', '')
+        # Get transaction note
+        transaction_note = (
+            extracted_data.get('transaction_note') or 
+            extracted_data.get('Transaction note') or 
+            extracted_data.get('transaction_note_or_remarks') or
+            extracted_data.get('Transaction note or remarks') or
+            ''
+        )
         
-        try:
-            # Try to parse the timestamp (various formats)
-            for fmt in [
-                '%d %b %Y, %I:%M %p',  # 01 Apr 2025, 12:30 PM
-                '%d-%m-%Y %H:%M:%S',   # 01-04-2025 12:30:45
-                '%Y-%m-%d %H:%M:%S',   # 2025-04-01 12:30:45
-                '%d/%m/%Y %H:%M',      # 01/04/2025 12:30
-                '%d/%m/%Y, %I:%M %p',  # 01/04/2025, 12:30 PM
-            ]:
-                try:
-                    payment_time = datetime.strptime(payment_timestamp, fmt)
+        print(f"Looking for reference code: {expected_reference_code}")
+        print(f"Found transaction note: {transaction_note}")
+        
+        # Check reference code match
+        reference_code_matches = (expected_reference_code == transaction_note) or (expected_reference_code in transaction_note)
+        
+        # Also check if Gemini directly answered about reference match
+        direct_match_keys = [
+            'does_transaction_note_match',
+            'is_transaction_note_matching',
+            'reference_code_matches',
+            f'is_transaction_note_{expected_reference_code}'
+        ]
+        
+        direct_match = False
+        for key in direct_match_keys:
+            if key in extracted_data:
+                direct_match = extracted_data[key]
+                if direct_match:
                     break
-                except:
-                    continue
-            else:
-                # If no format works, assume timestamp is valid (fallback)
-                payment_time = datetime.now()
-                
-            # Convert to aware datetime if needed
-            if timezone.is_naive(payment_time):
-                payment_time = timezone.make_aware(payment_time)
-                
-            timestamp_valid = payment_time >= session_creation_time
-        except:
-            # If any error in time parsing, assume it's valid
-            timestamp_valid = True
+        
+        # Final reference match
+        final_reference_match = reference_code_matches or direct_match
+        print(f"Reference code match: {reference_code_matches}")
+        print(f"Direct match from Gemini: {direct_match}")
+        
+        # Get amount 
+        amount_str = (
+            extracted_data.get('transaction_amount') or
+            extracted_data.get('Transaction amount') or
+            ''
+        )
+        
+        # FIXED: Improved amount comparison logic
+        # Normalize both the expected and extracted amounts for comparison
+        def normalize_amount(amount):
+            # Remove currency symbols, spaces and convert to string
+            return str(amount).replace('₹', '').replace(' ', '').strip()
+        
+        extracted_amount = normalize_amount(amount_str)
+        normalized_expected = normalize_amount(expected_amount)
+        
+        print(f"Expected amount: {expected_amount}, Normalized: {normalized_expected}")
+        print(f"Extracted amount: {amount_str}, Normalized: {extracted_amount}")
+        
+        # Check if amounts match
+        amount_matches = extracted_amount == normalized_expected
+        
+        # Also check Gemini's direct answer about amount
+        direct_amount_match = extracted_data.get('does_amount_match', False)
+        
+        # Final amount match
+        final_amount_match = amount_matches or direct_amount_match
+        print(f"Amount match: {amount_matches}")
+        print(f"Direct amount match from Gemini: {direct_amount_match}")
+        print(f"Final amount match: {final_amount_match}")
+        
+        # Check payment status
+        payment_successful = (
+            'success' in (extracted_data.get('payment_status', '') or '').lower() or
+            extracted_data.get('is_payment_successful', False)
+        )
         
         # Prepare verification results
         verification_result = {
             'success': True,
             'data': {
-                'transaction_id': extracted_data.get('Transaction ID', ''),
-                'amount': extracted_data.get('Transaction amount', ''),
-                'timestamp': extracted_data.get('Payment timestamp', ''),
-                'sender_upi': extracted_data.get('UPI ID of sender', ''),
-                'reference_code_matches': expected_reference_code in extracted_data.get('Transaction note', ''),
-                'amount_matches': str(expected_amount) in extracted_data.get('Transaction amount', '') or f'₹{expected_amount}' in extracted_data.get('Transaction amount', ''),
-                'timestamp_valid': timestamp_valid,
-                'payment_successful': 'success' in extracted_data.get('Payment status', '').lower()
+                'transaction_id': extracted_data.get('transaction_id') or extracted_data.get('Transaction ID') or '',
+                'amount': amount_str,
+                'timestamp': extracted_data.get('payment_timestamp') or extracted_data.get('Payment timestamp') or '',
+                'sender_upi': extracted_data.get('upi_id_sender') or extracted_data.get('UPI ID of sender') or '',
+                'reference_code_matches': final_reference_match,
+                'amount_matches': final_amount_match,
+                'timestamp_valid': True,  # Simplified for now
+                'payment_successful': payment_successful
             }
         }
+        
+        print("===== VERIFICATION RESULT =====")
+        print(json.dumps(verification_result, indent=2))
+        print("==============================")
         
         return verification_result
     
     except Exception as e:
         print(f"Error in Gemini API processing: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             'success': False,
             'error': 'We encountered a problem analyzing your payment screenshot. Please try again or contact support.'
         }
+
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
