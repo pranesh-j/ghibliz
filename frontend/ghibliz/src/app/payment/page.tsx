@@ -343,7 +343,7 @@ export default function PaymentPage() {
                       <div className="flex items-start">
                         <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
                         <p className="text-sm text-blue-700">
-                          After payment, you must verify by uploading a screenshot or providing the transaction ID. <span className="font-medium">Credits will be added to your account only after this process is completed</span>.
+                          After payment, you must verify by uploading a screenshot or providing the transaction ID. <span className="font-medium">Credits will be added only after verification is approved</span>.
                         </p>
                       </div>
                     </div>
@@ -394,38 +394,38 @@ export default function PaymentPage() {
                         <div className="flex justify-center gap-6 items-center">
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/gpay.svg"
                               alt="Google Pay"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/phonepe.svg"
                               alt="PhonePe"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/cred.svg"
                               alt="cred"
                               width={120}
                               height={120}
-                              className="h-12 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                         </div>
@@ -452,38 +452,38 @@ export default function PaymentPage() {
                         <div className="flex justify-center gap-6 mb-1"> {/* Increased gap */}
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/gpay.svg"
                               alt="Google Pay"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/phonepe.svg"
                               alt="PhonePe"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                           <a 
                             href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors flex items-center justify-center h-20"
+                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/cred.svg"
                               alt="cred"
                               width={120}
                               height={120}
-                              className="h-12 w-auto object-contain"
+                              className="h-16 w-auto object-contain" /* Doubled size */
                             />
                           </a>
                         </div>

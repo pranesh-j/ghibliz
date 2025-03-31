@@ -25,7 +25,8 @@ class Payment(models.Model):
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+    reference_code = models.CharField(max_length=12, blank=True, null=True)
+
     # Add these fields to the Payment model
     screenshot = models.ImageField(upload_to='payment_screenshots/', null=True, blank=True)
     upi_id = models.CharField(max_length=255, null=True, blank=True)
@@ -61,3 +62,32 @@ class PricingPlan(models.Model):
     class Meta:
         verbose_name = 'Pricing Plan'
         verbose_name_plural = 'Pricing Plans'
+
+# Add to payments/models.py
+class PaymentSession(models.Model):
+    SESSION_STATUS = (
+        ('pending', 'Pending'),
+        ('completed', 'Completed'),
+        ('expired', 'Expired'),
+        ('cancelled', 'Cancelled'),
+    )
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    plan = models.ForeignKey(PricingPlan, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    reference_code = models.CharField(max_length=12, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    status = models.CharField(max_length=20, choices=SESSION_STATUS, default='pending')
+    
+    def __str__(self):
+        return f"Payment Session {self.id} - {self.reference_code} - {self.status}"
+    
+    class Meta:
+        verbose_name = 'Payment Session'
+        verbose_name_plural = 'Payment Sessions'
+        ordering = ['-created_at']
+    
+    @property
+    def is_expired(self):
+        return timezone.now() > self.expires_at
