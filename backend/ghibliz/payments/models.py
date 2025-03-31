@@ -91,3 +91,25 @@ class PaymentSession(models.Model):
     @property
     def is_expired(self):
         return timezone.now() > self.expires_at
+
+
+class PaymentVerificationAttempt(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    session_id = models.IntegerField()
+    reference_code = models.CharField(max_length=12)
+    timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(max_length=20, choices=[
+        ('success', 'Success'),
+        ('failed', 'Failed')
+    ])
+    reason = models.CharField(max_length=50, null=True, blank=True)
+    payment = models.ForeignKey(Payment, on_delete=models.SET_NULL, null=True, blank=True)
+    error_details = models.TextField(null=True, blank=True)
+    
+    class Meta:
+        verbose_name = 'Payment Verification Attempt'
+        verbose_name_plural = 'Payment Verification Attempts'
+        ordering = ['-timestamp']
+    
+    def __str__(self):
+        return f"Verification {self.id} for {self.user.username} ({self.status})"

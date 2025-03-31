@@ -148,3 +148,5 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Site ID for Django sites framework
 SITE_ID = 1
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')

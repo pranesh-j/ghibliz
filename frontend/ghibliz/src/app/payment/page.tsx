@@ -8,8 +8,9 @@ import { CloudBackground } from "@/components/cloud-background"
 import { GhibliLogo } from "@/components/ghibli-logo"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
+import api from "@/services/api"
 
-// This is a simplified version since we don't have a real backend yet
+// Updated interfaces
 interface PricingPlan {
   id: number;
   name: string;
@@ -18,15 +19,13 @@ interface PricingPlan {
   is_active: boolean;
 }
 
-interface Payment {
-  id: number;
+interface PaymentSession {
+  session_id: number;
   amount: number;
-  currency: string;
-  credits_purchased: number;
-  payment_method: string;
-  transaction_id?: string;
-  status: string;
-  created_at: string;
+  plan_name: string;
+  expires_at: string;
+  upi_link: string;              // Direct UPI link from backend
+  qr_code_data: string;          // Base64 encoded QR code image
 }
 
 export default function PaymentPage() {
@@ -35,7 +34,6 @@ export default function PaymentPage() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   
-  // Set the exact pricing plans you want
   const pricingPlans: PricingPlan[] = [
     {
       id: 1,
@@ -58,55 +56,66 @@ export default function PaymentPage() {
   const [creatingPayment, setCreatingPayment] = useState(false)
   
   // Payment state
-  const [currentPayment, setCurrentPayment] = useState<Payment | null>(null)
-  const [paymentMode, setPaymentMode] = useState<'link' | 'qr'>('link') // Changed default to 'link'
-  const [verifyMode, setVerifyMode] = useState<'screenshot' | 'transaction'>('screenshot') // Changed default to 'screenshot'
-  const [transactionId, setTransactionId] = useState('')
+  const [currentSession, setCurrentSession] = useState<PaymentSession | null>(null)
+  const [paymentMode, setPaymentMode] = useState<'link' | 'qr'>('link')
   const [screenshot, setScreenshot] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [verificationComplete, setVerificationComplete] = useState(false)
+  const [countdown, setCountdown] = useState<number | null>(null)
   
-  // UPI details
-  const upiId = "pran.eth@axl" // Your actual UPI ID
-  const merchantName = "Ghibliz"
-  
-  // Create payment order
+  // Create payment session
   const handleCreatePayment = async () => {
     if (!selectedPlan) return
     
     setCreatingPayment(true)
     try {
-      // Mock API call
-      setTimeout(() => {
-        setCurrentPayment({
-          id: Math.floor(Math.random() * 1000000),
-          amount: selectedPlan.price_inr,
-          currency: "INR",
-          credits_purchased: selectedPlan.credits,
-          payment_method: "upi",
-          status: "pending",
-          created_at: new Date().toISOString()
-        });
-        
-        toast({
-          title: "Payment initialized",
-          description: "Complete the payment using UPI",
-          variant: "success"
-        });
-        
-        setCreatingPayment(false);
-      }, 1000);
+      // Real API call to create payment session
+      const response = await api.post('/payments/sessions/create/', {
+        plan_id: selectedPlan.id
+      });
+      
+      setCurrentSession(response.data);
+      
+      // Start the countdown (7 minutes)
+      const expiryTime = new Date(response.data.expires_at).getTime();
+      const now = new Date().getTime();
+      const timeLeft = Math.floor((expiryTime - now) / 1000);
+      setCountdown(timeLeft > 0 ? timeLeft : 0);
+      
+      toast({
+        title: "Payment initialized",
+        description: "Complete the payment using UPI",
+        variant: "success"
+      });
     } catch (error) {
-      console.error("Failed to create payment:", error)
+      console.error("Failed to create payment session:", error)
       toast({
         title: "Payment initialization failed",
         description: "Please try again",
         variant: "error"
       })
+    } finally {
       setCreatingPayment(false)
     }
   }
+  
+  // Update countdown timer
+  useEffect(() => {
+    if (countdown === null || countdown <= 0) return;
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [countdown]);
   
   // Handle screenshot upload
   const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,47 +153,65 @@ export default function PaymentPage() {
   
   // Handle verification submission
   const handleVerifyPayment = async () => {
-    if (!currentPayment) return
+    if (!currentSession || !screenshot) return
     
     setSubmittingVerification(true)
     try {
-      // Mock API call
-      setTimeout(() => {
-        setVerificationComplete(true)
-        
-        toast({
-          title: "Verification submitted",
-          description: "Your payment is being processed. Credits will be added soon.",
-          variant: "success"
-        })
-        
-        setSubmittingVerification(false)
-      }, 1500)
-    } catch (error) {
+      // Create form data for file upload
+      const formData = new FormData();
+      formData.append('screenshot', screenshot);
+      
+      // Send to backend for verification
+      const response = await api.post(`/payments/sessions/${currentSession.session_id}/verify/`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      
+      setVerificationComplete(true)
+      
+      toast({
+        title: "Verification successful",
+        description: response.data.message || "Credits have been added to your account",
+        variant: "success"
+      })
+    } catch (error: any) {
       console.error("Verification failed:", error)
+      
+      let errorMessage = "Please check your screenshot and try again";
+      
+      // Handle specific error cases
+      if (error.response?.status === 400) {
+        errorMessage = error.response.data.error || errorMessage;
+      } else if (error.response?.status === 404) {
+        errorMessage = "Payment session expired or not found";
+      }
+      
       toast({
         title: "Verification failed",
-        description: "Please check your information and try again",
+        description: errorMessage,
         variant: "error"
       })
+    } finally {
       setSubmittingVerification(false)
     }
   }
   
-  // Generate QR code data for the current payment
-  const getQrCodeData = () => {
-    if (!currentPayment) return ''
-    
-    return `upi://pay?pa=${upiId}&pn=${merchantName}&am=${currentPayment.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment.id}`
+  // Format countdown time
+  const formatCountdown = (seconds: number | null) => {
+    if (seconds === null) return '';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   }
   
   // Reset the payment process
   const handleReset = () => {
-    setCurrentPayment(null)
+    setCurrentSession(null)
     setVerificationComplete(false)
-    setTransactionId('')
     setScreenshot(null)
     setPreviewUrl(null)
+    setCountdown(null)
   }
   
   // Go back to home page
@@ -255,7 +282,7 @@ export default function PaymentPage() {
             <>
               {/* Payment Flow Container */}
               <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
-                {!currentPayment ? (
+                {!currentSession ? (
                   /* Step 1: Plan Selection */
                   <div>
                     <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
@@ -327,28 +354,35 @@ export default function PaymentPage() {
                       <div className="flex justify-between mb-2">
                         <span className="text-sm text-ghibli-dark/80">Amount:</span>
                         <span className="text-sm font-medium text-ghibli-dark">
-                          ₹{currentPayment.amount}
+                          ₹{currentSession.amount}
                         </span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-sm text-ghibli-dark/80">Order ID:</span>
                         <span className="text-sm font-medium text-ghibli-dark">
-                          #{currentPayment.id}
+                          #{currentSession.session_id}
                         </span>
                       </div>
                     </div>
                     
-                    {/* Important notice about crediting */}
-                    <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
-                      <div className="flex items-start">
-                        <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                        <p className="text-sm text-blue-700">
-                          After payment, you must verify by uploading a screenshot or providing the transaction ID. <span className="font-medium">Credits will be added only after verification is approved</span>.
-                        </p>
+                    {/* Countdown Timer */}
+                    {countdown !== null && (
+                      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
+                        <div className="flex items-start">
+                          <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                          <div>
+                            <p className="text-sm text-blue-700">
+                              <span className="font-medium">Time remaining to complete payment: {formatCountdown(countdown)}</span>
+                            </p>
+                            <p className="text-xs text-blue-600 mt-1">
+                              Please make payment and upload screenshot before time expires
+                            </p>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    )}
                     
-                    {/* Payment Method Toggle - Swapped order */}
+                    {/* Payment Method Toggle */}
                     <div className="flex border rounded-lg overflow-hidden mb-6">
                       <button
                         className={`flex-1 py-2 flex justify-center items-center ${
@@ -374,7 +408,7 @@ export default function PaymentPage() {
                       </button>
                     </div>
                     
-                    {/* UPI Link - Now first */}
+                    {/* UPI Link */}
                     {paymentMode === 'link' && (
                       <div className="mb-6">
                         <p className="text-sm text-center text-ghibli-dark mb-4">
@@ -383,7 +417,7 @@ export default function PaymentPage() {
                         
                         <div className="flex justify-center mb-4">
                           <a
-                            href={getQrCodeData()}
+                            href={currentSession.upi_link}
                             className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-6 rounded-lg font-medium text-base flex items-center"
                           >
                             <Smartphone className="mr-2 h-5 w-5" />
@@ -393,7 +427,7 @@ export default function PaymentPage() {
                         
                         <div className="flex justify-center gap-6 items-center">
                           <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
+                            href={currentSession.upi_link}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
@@ -401,11 +435,11 @@ export default function PaymentPage() {
                               alt="Google Pay"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              className="h-16 w-auto object-contain"
                             />
                           </a>
                           <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
+                            href={currentSession.upi_link}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
@@ -413,32 +447,33 @@ export default function PaymentPage() {
                               alt="PhonePe"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              className="h-16 w-auto object-contain"
                             />
                           </a>
                           <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
+                            href={currentSession.upi_link}
                             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                           >
                             <img
                               src="/cred.svg"
                               alt="cred"
-                              width={120}
-                              height={120}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              width={100}
+                              height={100}
+                              className="h-12 w-auto object-contain"
                             />
                           </a>
                         </div>
                       </div>
                     )}
                     
-                    {/* QR Code - Now second */}
+                    {/* QR Code */}
                     {paymentMode === 'qr' && (
                       <div className="mb-6">
                         <div className="flex justify-center mb-4">
                           <div className="bg-white p-3 rounded-lg border">
+                            {/* Use the base64 QR code image directly */}
                             <img
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(getQrCodeData())}`}
+                              src={currentSession.qr_code_data}
                               alt="UPI QR Code"
                               width={200}
                               height={200}
@@ -449,43 +484,34 @@ export default function PaymentPage() {
                         <p className="text-sm text-center text-ghibli-dark mb-2">
                           Scan with any UPI app to pay
                         </p>
-                        <div className="flex justify-center gap-6 mb-1"> {/* Increased gap */}
-                          <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
+                        <div className="flex justify-center gap-6 mb-1 items-center">
+                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <img
                               src="/gpay.svg"
                               alt="Google Pay"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              className="h-16 w-auto object-contain"
                             />
-                          </a>
-                          <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
+                          </div>
+                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <img
                               src="/phonepe.svg"
                               alt="PhonePe"
                               width={180}
                               height={180}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              className="h-16 w-auto object-contain"
                             />
-                          </a>
-                          <a 
-                            href={`upi://pay?pa=${upiId}&pn=Ghibliz&am=${currentPayment?.amount}&cu=INR&tn=Ghibliz_Payment_${currentPayment?.id || 'new'}`}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
+                          </div>
+                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
                             <img
                               src="/cred.svg"
                               alt="cred"
-                              width={120}
-                              height={120}
-                              className="h-16 w-auto object-contain" /* Doubled size */
+                              width={100}
+                              height={100}
+                              className="h-12 w-auto object-contain"
                             />
-                          </a>
+                          </div>
                         </div>
                       </div>
                     )}
@@ -500,159 +526,83 @@ export default function PaymentPage() {
                       <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md">
                         <p className="text-sm text-red-700 font-medium">Important Notice:</p>
                         <p className="text-xs text-red-600 mt-1">
-                          Any use of fake screenshots or fraudulent transaction IDs will result in your account being permanently banned. All payments are manually verified.
+                          Any use of fake screenshots or fraudulent transaction IDs will result in your account being permanently banned. All payments are verified automatically.
                         </p>
                       </div>
                       
-                      {/* Verification Method Toggle - swapped order */}
-                      <div className="flex border rounded-lg overflow-hidden mb-4">
-                        <button
-                          className={`flex-1 py-2 flex justify-center items-center ${
-                            verifyMode === 'screenshot'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                          } transition-colors`}
-                          onClick={() => setVerifyMode('screenshot')}
-                        >
-                          Screenshot
-                        </button>
-                        <button
-                          className={`flex-1 py-2 flex justify-center items-center ${
-                            verifyMode === 'transaction'
-                              ? 'bg-amber-100 text-amber-800'
-                              : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                          } transition-colors`}
-                          onClick={() => setVerifyMode('transaction')}
-                        >
-                          Transaction ID
-                        </button>
-                      </div>
-                      
-                      {/* Screenshot Upload - now default/first */}
-                      {verifyMode === 'screenshot' && (
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-ghibli-dark mb-1">
-                            Upload Payment Screenshot
-                          </label>
-                          
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handleScreenshotChange}
-                            className="hidden"
-                          />
-                          
-                          {!previewUrl ? (
-                            <div 
-                              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-amber-300 transition-colors"
-                              onClick={() => fileInputRef.current?.click()}
+                      {/* Screenshot Upload */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-ghibli-dark mb-1">
+                          Upload Payment Screenshot
+                        </label>
+                        
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handleScreenshotChange}
+                          className="hidden"
+                        />
+                        
+                        {!previewUrl ? (
+                          <div 
+                            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-amber-300 transition-colors"
+                            onClick={() => fileInputRef.current?.click()}
+                          >
+                            <Upload className="h-8 w-8 mx-auto text-ghibli-dark/50 mb-2" />
+                            <p className="text-sm text-ghibli-dark">
+                              Click to upload screenshot
+                            </p>
+                            <p className="text-xs text-ghibli-dark/70 mt-1">
+                              JPG, PNG or GIF (max 5MB)
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="relative border rounded-lg overflow-hidden">
+                            <img
+                              src={previewUrl}
+                              alt="Payment Screenshot"
+                              className="w-full h-auto max-h-48 object-contain"
+                            />
+                            <button
+                              className="absolute top-2 right-2 bg-white/80 rounded-full p-1 hover:bg-white/100 transition-colors"
+                              onClick={() => {
+                                setScreenshot(null);
+                                setPreviewUrl(null);
+                                if (fileInputRef.current) {
+                                  fileInputRef.current.value = "";
+                                }
+                              }}
                             >
-                              <Upload className="h-8 w-8 mx-auto text-ghibli-dark/50 mb-2" />
-                              <p className="text-sm text-ghibli-dark">
-                                Click to upload screenshot
-                              </p>
-                              <p className="text-xs text-ghibli-dark/70 mt-1">
-                                JPG, PNG or GIF (max 5MB)
-                              </p>
-                            </div>
-                          ) : (
-                            <div className="relative border rounded-lg overflow-hidden">
-                              <img
-                                src={previewUrl}
-                                alt="Payment Screenshot"
-                                className="w-full h-auto max-h-48 object-contain"
-                              />
-                              <button
-                                className="absolute top-2 right-2 bg-white/80 rounded-full p-1 hover:bg-white/100 transition-colors"
-                                onClick={() => {
-                                  setScreenshot(null);
-                                  setPreviewUrl(null);
-                                  if (fileInputRef.current) {
-                                    fileInputRef.current.value = "";
-                                  }
-                                }}
-                              >
-                                <X className="h-4 w-4 text-ghibli-dark" />
-                              </button>
-                            </div>
-                          )}
+                              <X className="h-4 w-4 text-ghibli-dark" />
+                            </button>
+                          </div>
+                        )}
 
-                          {/* Screenshot examples guide */}
-                          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                            <p className="text-xs font-medium text-ghibli-dark mb-2">
-                              Screenshot Guide:
-                            </p>
-                            <p className="text-xs text-ghibli-dark/80 mb-2">
-                              Please capture the entire payment confirmation screen showing:
-                            </p>
-                            <ul className="text-xs text-ghibli-dark/80 list-disc pl-4 space-y-1">
-                              <li>Transaction amount (₹{currentPayment.amount})</li>
-                              <li>Transaction ID/Reference Number</li>
-                              <li>Payment status (Successful)</li>
-                              <li>Date and time of transaction</li>
-                            </ul>
-                          </div>
+                        {/* Screenshot examples guide */}
+                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-xs font-medium text-ghibli-dark mb-2">
+                            Screenshot Guide:
+                          </p>
+                          <p className="text-xs text-ghibli-dark/80 mb-2">
+                            Please capture the entire payment confirmation screen without hiding any important details such as transaction ID etc.
+                          </p>
+                          <p className="text-xs text-ghibli-dark/80 mt-2 font-medium">
+  <span className="text-blue-700">Important: Do not crop your screenshots as verification will fail for any cropped out screenshots. We don't store your screenshots after verification.</span>
+</p>
                         </div>
-                      )}
-                      
-                      {/* Transaction ID Input - now second option */}
-                      {verifyMode === 'transaction' && (
-                        <div className="mb-4">
-                          <label className="block text-sm font-medium text-ghibli-dark mb-1">
-                            Enter UPI Transaction ID
-                          </label>
-                          <input
-                            type="text"
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                            placeholder="e.g. 123456789012"
-                            value={transactionId}
-                            onChange={(e) => setTransactionId(e.target.value)}
-                          />
-                          
-                          {/* Transaction ID guide */}
-                          <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                            <p className="text-xs font-medium text-ghibli-dark mb-2">
-                              Where to find your Transaction ID:
-                            </p>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
-                              <div className="p-2 bg-white rounded border border-gray-200">
-                                <p className="text-xs font-medium text-center mb-1">Google Pay</p>
-                                <p className="text-xs text-center text-ghibli-dark/80">
-                                  Check payment history → Select this transaction → Look for "UPI Reference ID"
-                                </p>
-                              </div>
-                              <div className="p-2 bg-white rounded border border-gray-200">
-                                <p className="text-xs font-medium text-center mb-1">PhonePe</p>
-                                <p className="text-xs text-center text-ghibli-dark/80">
-                                  Home → History → Select transaction → Find "Transaction ID"
-                                </p>
-                              </div>
-                              <div className="p-2 bg-white rounded border border-gray-200">
-                                <p className="text-xs font-medium text-center mb-1">CRED</p>
-                                <p className="text-xs text-center text-ghibli-dark/80">
-                                  UPI History → Select payment → Look for "Reference ID"
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                       
                       <div className="flex gap-3 mt-6">
                         <Button
                           className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-medium"
                           onClick={handleVerifyPayment}
-                          disabled={
-                            submittingVerification ||
-                            (verifyMode === 'transaction' && !transactionId) ||
-                            (verifyMode === 'screenshot' && !screenshot)
-                          }
+                          disabled={submittingVerification || !screenshot || countdown === 0}
                         >
                           {submittingVerification ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Verifying...
+                              Verifying Payment...
                             </>
                           ) : (
                             "Verify Payment"
@@ -677,12 +627,11 @@ export default function PaymentPage() {
                     </div>
                     
                     <h2 className="text-xl font-playfair text-ghibli-dark mb-2">
-                      Payment Submitted!
+                      Payment Verified!
                     </h2>
                     
                     <p className="text-ghibli-dark/80 mb-6 max-w-md mx-auto">
-                      Your payment is being verified. Credits will be added to your account 
-                      as soon as the payment is confirmed (usually within 24 hours).
+                      Your payment has been verified and credits have been added to your account.
                     </p>
                     
                     <div className="flex justify-center gap-4">
@@ -709,8 +658,8 @@ export default function PaymentPage() {
                 <div className="bg-amber-50 rounded-lg p-4 text-sm text-ghibli-dark/80">
                   <p className="font-medium text-ghibli-dark mb-2">Payment Information</p>
                   <ul className="list-disc pl-5 space-y-1">
-                    <li>Payments are processed manually within 24 hours</li>
-                    <li>Credits will be added to your account after verification</li>
+                    <li>Payments are verified automatically via screenshot</li>
+                    <li>Your payment must be completed within the countdown time</li>
                     <li>For any issues, contact support@ghibliz.com</li>
                   </ul>
                 </div>

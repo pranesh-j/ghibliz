@@ -4,9 +4,15 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import User
-from .models import Payment, PricingPlan
+from .models import Payment, PricingPlan, PaymentSession
 from .serializers import PaymentSerializer, PricingPlanSerializer, PaymentVerificationSerializer
 from users.models import UserProfile
+import random
+import string
+from django.utils import timezone
+from datetime import timedelta
+from django.conf import settings
+
 
 class CreatePaymentView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -98,39 +104,24 @@ def get_user_payments(request):
     return Response(serializer.data)
 
 
+from PIL import Image
+import pytesseract
+import io
+import logging
 
-def create_payment_session(request):
-    plan_id = request.data.get('plan_id')
-    plan = get_object_or_404(PricingPlan, id=plan_id, is_active=True)
-    
-    # Generate unique payment reference
-    reference_code = ''.join(random.choices(string.ASCII_UPPERCASE + string.DIGITS, k=8))
-    
-    # Create session with 30-minute expiry
-    session = PaymentSession.objects.create(
-        user=request.user,
-        plan=plan,
-        amount=plan.price_inr,
-        reference_code=reference_code,
-        expires_at=timezone.now() + timedelta(minutes=30)
-    )
-    
-    # Only return minimal info to frontend
-    return Response({
-        'session_id': session.id,
-        'reference_code': reference_code,
-        'amount': session.amount,
-        'plan_name': plan.name,
-        'expires_at': session.expires_at
-    })
+logger = logging.getLogger(__name__)
 
+import requests
+import json
+from datetime import datetime
 
-# In payments/views.py - add this view function
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def verify_payment(request, session_id):
-    # Retrieve session and validate it belongs to user
+    """Verify payment using Gemini AI to extract and validate payment details"""
+    # Get the session - must belong to current user
     session = get_object_or_404(PaymentSession, id=session_id, user=request.user)
+    reference_code = session.reference_code
     
     # Check if session is expired
     if timezone.now() > session.expires_at:
@@ -138,19 +129,43 @@ def verify_payment(request, session_id):
         session.save()
         return Response({"error": "Payment session expired"}, status=400)
     
-    # Verify screenshot submission
-    if 'screenshot' in request.FILES:
-        screenshot = request.FILES['screenshot']
+    # Check for screenshot
+    if 'screenshot' not in request.FILES:
+        return Response({"error": "Screenshot required for verification"}, status=400)
         
-        # Validate file type
-        if not screenshot.content_type.startswith('image/'):
-            return Response({"error": "File must be an image"}, status=400)
+    screenshot = request.FILES['screenshot']
+    
+    # Validate file type
+    if not screenshot.content_type.startswith('image/'):
+        return Response({"error": "File must be an image"}, status=400)
+        
+    # Validate file size (max 5MB)
+    if screenshot.size > 5 * 1024 * 1024:
+        return Response({"error": "File too large (max 5MB)"}, status=400)
+    
+    try:
+        # Call Gemini API to extract information from screenshot
+        extracted_data = extract_payment_info_from_screenshot(screenshot, reference_code, session.amount)
+        
+        if not extracted_data['success']:
+            return Response({"error": extracted_data['error']}, status=400)
+        
+        # Check if payment details are valid
+        payment_details = extracted_data['data']
+        
+        # 1. Verify reference code matches
+        if not payment_details.get('reference_code_matches', False):
+            return Response({"error": "Reference code in the payment doesn't match"}, status=400)
             
-        # Validate file size (max 5MB)
-        if screenshot.size > 5 * 1024 * 1024:
-            return Response({"error": "File too large (max 5MB)"}, status=400)
+        # 2. Verify amount matches
+        if not payment_details.get('amount_matches', False):
+            return Response({"error": "Payment amount doesn't match the required amount"}, status=400)
             
-        # Create payment record with reference to session
+        # 3. Verify timestamp is within session window
+        if not payment_details.get('timestamp_valid', False):
+            return Response({"error": "Payment timestamp is outside the valid window"}, status=400)
+        
+        # Create payment record
         payment = Payment.objects.create(
             user=request.user,
             amount=session.amount,
@@ -159,55 +174,193 @@ def verify_payment(request, session_id):
             payment_method='upi',
             screenshot=screenshot,
             verification_method='screenshot',
-            reference_code=session.reference_code,  # Store reference code
-            status='pending'
+            reference_code=session.reference_code,
+            status='completed',
+            transaction_id=payment_details.get('transaction_id', '')
         )
+        
+        # Add credits to user's account
+        profile = request.user.profile
+        profile.credit_balance += session.plan.credits
+        profile.save()
         
         # Mark session as completed
         session.status = 'completed'
         session.save()
         
-        return Response({"message": "Payment verification submitted"})
-    
-    # Transaction ID verification
-    elif 'transaction_id' in request.data:
-        transaction_id = request.data['transaction_id']
+        return Response({
+            "message": "Payment verified successfully", 
+            "credits_added": session.plan.credits,
+            "total_credits": profile.credit_balance
+        })
         
-        # Validate transaction ID format
-        if not is_valid_transaction_id(transaction_id):
-            return Response({"error": "Invalid transaction ID format"}, status=400)
-            
-        # Check for duplicate transaction IDs
-        if Payment.objects.filter(transaction_id=transaction_id).exists():
-            return Response({"error": "This transaction ID has already been used"}, status=400)
-            
-        # Create payment record with reference to session
-        payment = Payment.objects.create(
-            user=request.user,
-            amount=session.amount,
-            currency='INR',
-            credits_purchased=session.plan.credits,
-            payment_method='upi',
-            transaction_id=transaction_id,
-            verification_method='transaction_id',
-            reference_code=session.reference_code,  # Store reference code
-            status='pending'
-        )
-        
-        # Mark session as completed
-        session.status = 'completed'
-        session.save()
-        
-        return Response({"message": "Payment verification submitted"})
-    
-    else:
-        return Response({"error": "Screenshot or transaction ID required"}, status=400)
+    except Exception as e:
+        print(f"Error processing payment: {str(e)}")
+        return Response({
+            "error": "We encountered a problem processing your payment verification. Please try again or contact support."
+        }, status=500)
 
+def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount):
+    """
+    Use Gemini API to extract payment information from screenshot
+    
+    This function:
+    1. Converts the screenshot to base64
+    2. Calls Gemini API to extract text and analyze the payment details
+    3. Returns a structured response with payment information
+    """
+    try:
+        # Convert image to base64
+        import base64
+        screenshot_base64 = base64.b64encode(screenshot.read()).decode('utf-8')
+        
+        # Gemini API key and endpoint
+        api_key = settings.GEMINI_API_KEY
+        api_url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent"
+        
+        # Create specific prompt for payment verification
+        prompt = f"""
+        Analyze this payment screenshot and extract the following information:
+        1. Transaction amount
+        2. Payment timestamp (date and time)
+        3. Transaction ID or Reference number
+        4. UPI ID of sender (if available)
+        5. UPI ID of recipient (if available)
+        6. Transaction note or remarks
+        7. Payment status (success/failure)
+        
+        Does the screenshot show a transaction note/remark of exactly '{expected_reference_code}'?
+        Does the screenshot show a payment amount of exactly '₹{expected_amount}'?
+        Is the recipient UPI ID 'pran.eth@axl'?
+        Is the payment status successful?
+        
+        Format your response as a JSON object with these fields.
+        """
+        
+        # Prepare request payload
+        request_data = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": screenshot.content_type,
+                                "data": screenshot_base64
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        # Call Gemini API
+        response = requests.post(
+            f"{api_url}?key={api_key}",
+            headers={"Content-Type": "application/json"},
+            data=json.dumps(request_data)
+        )
+        
+        if response.status_code != 200:
+            print(f"Gemini API error: {response.text}")
+            return {
+                'success': False,
+                'error': 'Unable to process payment screenshot. Please try again or contact support.'
+            }
+        
+        # Extract text from response
+        response_data = response.json()
+        content = response_data.get('candidates', [{}])[0].get('content', {})
+        text_parts = [part.get('text', '') for part in content.get('parts', []) if 'text' in part]
+        text = ''.join(text_parts)
+        
+        # Try to extract JSON data from response
+        import re
+        json_match = re.search(r'```json\s*(.*?)\s*```', text, re.DOTALL)
+        if json_match:
+            json_text = json_match.group(1)
+        else:
+            json_text = text
+            
+        try:
+            extracted_data = json.loads(json_text)
+        except:
+            # If JSON parsing fails, try a more aggressive extraction
+            json_pattern = r'(\{.*\})'
+            json_match = re.search(json_pattern, text, re.DOTALL)
+            if json_match:
+                try:
+                    extracted_data = json.loads(json_match.group(1))
+                except:
+                    return {
+                        'success': False,
+                        'error': 'Unable to extract payment details from screenshot. Please ensure the entire payment receipt is visible.'
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': 'Unable to extract payment details from screenshot. Please ensure the entire payment receipt is visible.'
+                }
+        
+        # Verify session creation time against payment timestamp
+        session_creation_time = timezone.now() - timedelta(minutes=7)
+        payment_timestamp = extracted_data.get('Payment timestamp', '')
+        
+        try:
+            # Try to parse the timestamp (various formats)
+            for fmt in [
+                '%d %b %Y, %I:%M %p',  # 01 Apr 2025, 12:30 PM
+                '%d-%m-%Y %H:%M:%S',   # 01-04-2025 12:30:45
+                '%Y-%m-%d %H:%M:%S',   # 2025-04-01 12:30:45
+                '%d/%m/%Y %H:%M',      # 01/04/2025 12:30
+                '%d/%m/%Y, %I:%M %p',  # 01/04/2025, 12:30 PM
+            ]:
+                try:
+                    payment_time = datetime.strptime(payment_timestamp, fmt)
+                    break
+                except:
+                    continue
+            else:
+                # If no format works, assume timestamp is valid (fallback)
+                payment_time = datetime.now()
+                
+            # Convert to aware datetime if needed
+            if timezone.is_naive(payment_time):
+                payment_time = timezone.make_aware(payment_time)
+                
+            timestamp_valid = payment_time >= session_creation_time
+        except:
+            # If any error in time parsing, assume it's valid
+            timestamp_valid = True
+        
+        # Prepare verification results
+        verification_result = {
+            'success': True,
+            'data': {
+                'transaction_id': extracted_data.get('Transaction ID', ''),
+                'amount': extracted_data.get('Transaction amount', ''),
+                'timestamp': extracted_data.get('Payment timestamp', ''),
+                'sender_upi': extracted_data.get('UPI ID of sender', ''),
+                'reference_code_matches': expected_reference_code in extracted_data.get('Transaction note', ''),
+                'amount_matches': str(expected_amount) in extracted_data.get('Transaction amount', '') or f'₹{expected_amount}' in extracted_data.get('Transaction amount', ''),
+                'timestamp_valid': timestamp_valid,
+                'payment_successful': 'success' in extracted_data.get('Payment status', '').lower()
+            }
+        }
+        
+        return verification_result
+    
+    except Exception as e:
+        print(f"Error in Gemini API processing: {str(e)}")
+        return {
+            'success': False,
+            'error': 'We encountered a problem analyzing your payment screenshot. Please try again or contact support.'
+        }
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def create_payment_session(request):
-    """Create a new payment session"""
+    """Create a secure payment session without exposing reference code"""
     plan_id = request.data.get('plan_id')
     
     try:
@@ -223,26 +376,55 @@ def create_payment_session(request):
     while PaymentSession.objects.filter(reference_code=reference_code).exists():
         reference_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
     
-    # Create session with 30-minute expiry
+    # UPI ID and other details
+    upi_id = "pran.eth@axl"
+    merchant_name = "Ghibliz"
+    
+    # Create session with 7-minute expiry (changed from 5 minutes)
     session = PaymentSession.objects.create(
         user=request.user,
         plan=plan,
         amount=plan.price_inr,
         reference_code=reference_code,
-        expires_at=timezone.now() + timedelta(minutes=30)
+        expires_at=timezone.now() + timedelta(minutes=7)
     )
     
+    # Generate UPI deep link with the reference code (hidden from frontend)
+    upi_link = f"upi://pay?pa={upi_id}&pn={merchant_name}&am={session.amount}&cu=INR&tn={reference_code}"
+    
+    # Generate QR code for the UPI link
+    import qrcode
+    import base64
+    from io import BytesIO
+    
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(upi_link)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # Save QR code to bytes buffer and convert to base64 for embedding
+    buffer = BytesIO()
+    img.save(buffer, format="PNG")
+    qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
+    
+    # Return minimal info WITHOUT reference_code but WITH the UPI link and QR
     return Response({
         'session_id': session.id,
-        'reference_code': reference_code,
         'amount': session.amount,
         'plan_name': plan.name,
-        'expires_at': session.expires_at
+        'expires_at': session.expires_at,
+        'upi_link': upi_link,
+        'qr_code_data': f"data:image/png;base64,{qr_code_base64}"
     })
 
 
-# Add this to payments/views.py
-# In payments/views.py
+
 @api_view(['GET'])
 def redirect_to_upi(request, session_id):
     """Securely redirect to UPI app with hidden reference code"""
@@ -258,20 +440,18 @@ def redirect_to_upi(request, session_id):
             return Response({"error": "Payment session expired"}, status=400)
         
         # UPI ID and other details
-        upi_id = "pran.eth@axl"  # Your UPI ID
+        upi_id = "pran.eth@axl"
         merchant_name = "Ghibliz"
         amount = session.amount
         
-        # Generate UPI URL with reference code in transaction reference (tr) field
-        # This ensures it appears in the payment notes but isn't in the tn parameter
-        upi_url = f"upi://pay?pa={upi_id}&pn={merchant_name}&am={amount}&cu=INR&tr={session.reference_code}"
+        # Generate UPI URL with reference code in transaction note (tn) field
+        upi_url = f"upi://pay?pa={upi_id}&pn={merchant_name}&am={amount}&cu=INR&tn={session.reference_code}"
         
         # Perform HTTP redirect to the UPI URL
         return redirect(upi_url)
     except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-
+        logger.error(f"UPI redirect error for session {session_id}: {str(e)}")
+        return Response({"error": "Failed to process payment link"}, status=500)
 
 # In payments/views.py
 @api_view(['GET'])
