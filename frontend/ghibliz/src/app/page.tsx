@@ -11,10 +11,13 @@ import { GhibliLogo } from "@/components/ghibli-logo"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
 import ImageService, { RecentImage } from "@/services/imageService"
+import { useRouter } from "next/navigation"
+
 
 export default function Home() {
   const { user, isAuthenticated, logout, loading: authLoading } = useAuth()
   const { toast } = useToast()
+  const router = useRouter();
   
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [processedImage, setProcessedImage] = useState<string | null>(null)
@@ -354,15 +357,11 @@ export default function Home() {
   }
 
   const handleBuyCredits = () => {
-    // Redirect to credits purchase page
-    // For now, just show a toast
-    toast({
-      title: "Coming soon",
-      description: "Credit purchases will be available soon!",
-      variant: "info"
-    })
-    // Close the promo popup to avoid having both messages visible
-    setShowPromoPopup(false)
+    // Redirect to the payment page
+    router.push('/payment');
+    
+    // Close the promo popup if it's open
+    setShowPromoPopup(false);
   }
 
   return (
@@ -395,7 +394,7 @@ export default function Home() {
                       </span>
                       <Button
                         className="p-1 h-auto bg-transparent hover:bg-transparent text-amber-600"
-                        onClick={handleBuyCredits}
+                        onClick={() => router.push('/payment')}
                       >
                         <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>

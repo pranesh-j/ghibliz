@@ -13,6 +13,7 @@ urlpatterns = [
     path('', home, name='home'),
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
+    path('api/payments/', include('payments.urls')),
     
     # Explicit media serving pattern for development
     # This ensures media files are served even if the automatic approach fails

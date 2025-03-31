@@ -25,6 +25,17 @@ class Payment(models.Model):
     status = models.CharField(max_length=20, choices=PAYMENT_STATUS, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # Add these fields to the Payment model
+    screenshot = models.ImageField(upload_to='payment_screenshots/', null=True, blank=True)
+    upi_id = models.CharField(max_length=255, null=True, blank=True)
+    upi_reference = models.CharField(max_length=255, null=True, blank=True)
+    is_blocked = models.BooleanField(default=False)  # To allow admin to block users
+    verification_method = models.CharField(
+        max_length=20, 
+        choices=[('transaction_id', 'Transaction ID'), ('screenshot', 'Screenshot')],
+        null=True, blank=True
+    )
 
     def __str__(self):
         return f"Payment {self.id} by {self.user.username} ({self.status})"
