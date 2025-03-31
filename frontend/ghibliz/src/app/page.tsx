@@ -53,7 +53,12 @@ export default function Home() {
       setLoadingRecentWorks(true)
       try {
         const data = await ImageService.getRecentImages(6)
-        setRecentWorks(data)
+        // Filter out items with invalid URLs if possible
+        const validData = data.filter(item => 
+          (item.original && !item.original.includes('undefined')) || 
+          (item.processed && !item.processed.includes('undefined'))
+        )
+        setRecentWorks(validData.length > 0 ? validData : data)
       } catch (error) {
         console.error("Failed to fetch recent works:", error)
         toast({
@@ -111,6 +116,17 @@ export default function Home() {
   }, [])
   
   const handleViewImage = (type: "original" | "processed") => {
+    // Check if image is available before opening viewer
+    if (type === "processed" && !processedImage) {
+      toast({
+        title: "Image not available",
+        description: "Processed image is not yet available or failed to load",
+        variant: "error"
+      });
+      return;
+    }
+    
+    console.log(`Viewing ${type} image:`, type === "original" ? selectedImage : processedImage);
     setViewingImage(type);
     setIsFullView(true);
   }
@@ -162,8 +178,36 @@ export default function Home() {
       // Call the API to transform the image
       const response = await ImageService.transformImage(file)
       
+      // Log response for debugging
+      console.log('Image transformation response:', response)
+      
       // Set the processed image URL and data
-      setProcessedImage(response.preview_url || response.image_url)
+      const imageUrl = response.preview_url || response.image_url
+      console.log('Setting processed image URL:', imageUrl)
+      
+      // Handle case where we got base64 image data directly
+      if (imageUrl && imageUrl.startsWith('data:image')) {
+        setProcessedImage(imageUrl)
+      } 
+      // Handle case where we got a URL but need to check if it's valid
+      else if (imageUrl) {
+        // For URLs, we'll still set it but also add a fallback
+        setProcessedImage(imageUrl)
+        // Create a backup image in case of 404
+        const img = new Image()
+        img.onerror = () => {
+          console.warn("Image URL failed to load, checking for image_data fallback")
+          // If there's fallback base64 data in the response, use that instead
+          if (response.image_data) {
+            console.log("Using image_data fallback")
+            setProcessedImage(response.image_data)
+          }
+        }
+        img.src = imageUrl
+      } else {
+        console.error("No valid image URL or data received")
+      }
+      
       setImageData(response)
       
       // Mark that user has used their free image if not authenticated
@@ -222,8 +266,23 @@ export default function Home() {
     
     try {
       // If paid image, download the full version, otherwise use preview
-      if (imageData.is_paid) {
-        await ImageService.downloadAndSaveImage(imageData.id, imageData.download_token)
+      if (imageData.is_paid && imageData.id && imageData.download_token) {
+        try {
+          await ImageService.downloadAndSaveImage(imageData.id, imageData.download_token)
+        } catch (err) {
+          console.error("Error downloading via API:", err)
+          // Fallback to direct base64 download if available
+          if (processedImage && processedImage.startsWith('data:image')) {
+            const link = document.createElement('a')
+            link.href = processedImage
+            link.download = `ghiblified-preview-${imageData.id || 'image'}.jpg`
+            document.body.appendChild(link)
+            link.click()
+            link.remove()
+          } else {
+            throw err
+          }
+        }
       } else {
         // Download the preview version
         const link = document.createElement('a')
@@ -411,12 +470,12 @@ export default function Home() {
               <div className={`p-4 sm:p-6 bg-white/90 backdrop-blur-sm rounded-3xl border border-amber-100 shadow-xl max-w-3xl mx-auto ${isFullView ? 'pt-2 pb-2' : ''}`}>
                 {viewingImage ? (
                   // Full image viewer without any extras
-                  <div className="py-2 -mt-6 sm:-mt-8">
+                  <div className="py-2 -mt-10 sm:-mt-12">
                     <div className="relative w-full flex justify-center">
-                      {/* Close button */}
+                      {/* Close button - Moved to outer div for better positioning */}
                       <button 
                         onClick={handleCloseViewer}
-                        className="absolute top-2 right-2 z-10 bg-white/80 rounded-full p-1.5 shadow-md hover:bg-white"
+                        className="absolute -top-2 right-2 z-30 bg-white/90 rounded-full p-1.5 shadow-md hover:bg-white"
                         aria-label="Close viewer"
                       >
                         <X className="h-5 w-5 text-ghibli-dark" />
@@ -497,6 +556,25 @@ export default function Home() {
                                 src={processedImage}
                                 alt="Processed"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  console.error("Failed to load processed image:", processedImage);
+                                  
+                                  // Try to display a fallback message in the image container
+                                  const container = e.currentTarget.parentElement;
+                                  if (container) {
+                                    e.currentTarget.style.display = 'none';
+                                    const fallbackEl = document.createElement('div');
+                                    fallbackEl.className = 'w-full h-full flex items-center justify-center bg-amber-50';
+                                    fallbackEl.innerHTML = '<p class="text-sm text-center px-4">Image processed but temporarily unavailable.<br>Try downloading instead.</p>';
+                                    container.appendChild(fallbackEl);
+                                  }
+                                  
+                                  toast({
+                                    title: "Image display issue",
+                                    description: "The image was processed but can't be displayed. Try the download button.",
+                                    variant: "warning"
+                                  });
+                                }}
                               />
                             </div>
                           )
@@ -576,6 +654,13 @@ export default function Home() {
                             src={item.original || "/api/placeholder/400/300"}
                             alt={`Creation ${item.id}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Replace with placeholder on error
+                              e.currentTarget.src = "/api/placeholder/400/300";
+                              if (e.currentTarget.src.includes("placeholder")) {
+                                e.currentTarget.onerror = null; // Prevent infinite loop
+                              }
+                            }}
                           />
                         </div>
                       </div>
@@ -612,6 +697,13 @@ export default function Home() {
                             src={item.processed || "/api/placeholder/400/300"}
                             alt={`Creation ${item.id}`}
                             className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Replace with placeholder on error
+                              e.currentTarget.src = "/api/placeholder/400/300";
+                              if (e.currentTarget.src.includes("placeholder")) {
+                                e.currentTarget.onerror = null; // Prevent infinite loop
+                              }
+                            }}
                           />
                         </div>
                       </div>
