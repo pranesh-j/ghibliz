@@ -1,4 +1,4 @@
-from django.shortcuts import render, get_object_or_404
+from django.shortcuts import render, get_object_or_404, redirect
 from rest_framework import status, views, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -12,6 +12,7 @@ import string
 from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
+from django.http import HttpResponse
 
 
 class CreatePaymentView(views.APIView):
@@ -145,7 +146,12 @@ def verify_payment(request, session_id):
     
     try:
         # Call Gemini API to extract information from screenshot
-        extracted_data = extract_payment_info_from_screenshot(screenshot, reference_code, session.amount)
+        extracted_data = extract_payment_info_from_screenshot(
+            screenshot, 
+            reference_code, 
+            session.amount,
+            session.created_at  # Pass session creation time
+        )
         
         if not extracted_data['success']:
             return Response({"error": extracted_data['error']}, status=400)
@@ -156,6 +162,8 @@ def verify_payment(request, session_id):
         # Print all verification results for debugging
         print(f"Verification details: reference={payment_details.get('reference_code_matches')}, "
               f"amount={payment_details.get('amount_matches')}, "
+              f"timestamp={payment_details.get('timestamp_valid')}, "
+              f"recipient={payment_details.get('recipient_verified')}, "
               f"success={payment_details.get('payment_successful')}")
         
         # 1. Verify reference code matches
@@ -174,6 +182,18 @@ def verify_payment(request, session_id):
         if not payment_details.get('payment_successful', False):
             return Response({
                 "error": "The payment appears to have failed or is pending. Please provide a screenshot of a successful payment."
+            }, status=400)
+        
+        # 4. Verify timestamp is valid
+        if not payment_details.get('timestamp_valid', False):
+            return Response({
+                "error": "The payment timestamp is invalid. The payment must be made after creating the session and not in the future."
+            }, status=400)
+            
+        # 5. Verify recipient is correct
+        if not payment_details.get('recipient_verified', False):
+            return Response({
+                "error": "Payment recipient doesn't match expected recipient (pran.eth@axl or Pranesh Jahagirdar). Please ensure you're sending to the correct account."
             }, status=400)
         
         # Create payment record
@@ -213,7 +233,7 @@ def verify_payment(request, session_id):
             "error": "We encountered a problem processing your payment verification. Please try again or contact support."
         }, status=500)
 
-def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount):
+def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount, session_created_at=None):
     """
     Use Gemini API to extract payment information from screenshot
     """
@@ -234,13 +254,15 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         3. Transaction ID or Reference number
         4. UPI ID of sender (if available)
         5. UPI ID of recipient (if available)
-        6. Transaction note or remarks (this is the most important a 8-digit alphanumeric reference code from the payment screenshot. The reference code should consist of uppercase letters and digits)
-        7. Payment status (success/failure)
+        6. Name of recipient (if available)
+        7. Transaction note or remarks (this is the most important a 8-digit alphanumeric reference code from the payment screenshot. The reference code should consist of uppercase letters and digits)
+        8. Payment status (success/failure)
         
         Compare these details with:
         - Expected reference code: '{expected_reference_code}'
         - Expected amount: ₹{expected_amount}
-        - Expected recipient: 'pran.eth@axl'
+        - Expected recipient UPI ID: 'pran.eth@axl'
+        - Expected recipient name: 'Pranesh Jahagirdar'
         
         Format your response as a JSON object with these fields.
         """
@@ -360,11 +382,17 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             ''
         )
         
-        # FIXED: Improved amount comparison logic
-        # Normalize both the expected and extracted amounts for comparison
+        # Improved amount comparison logic
         def normalize_amount(amount):
+            """Convert amount string to numeric value for comparison"""
             # Remove currency symbols, spaces and convert to string
-            return str(amount).replace('₹', '').replace(' ', '').strip()
+            cleaned = str(amount).replace('₹', '').replace(' ', '').strip()
+            try:
+                # Convert to float for numerical comparison
+                return float(cleaned)
+            except (ValueError, TypeError):
+                # Return original cleaned string if conversion fails
+                return cleaned
         
         extracted_amount = normalize_amount(amount_str)
         normalized_expected = normalize_amount(expected_amount)
@@ -372,8 +400,12 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         print(f"Expected amount: {expected_amount}, Normalized: {normalized_expected}")
         print(f"Extracted amount: {amount_str}, Normalized: {extracted_amount}")
         
-        # Check if amounts match
-        amount_matches = extracted_amount == normalized_expected
+        # Check if amounts match using numerical comparison with tolerance
+        try:
+            amount_matches = abs(float(extracted_amount) - float(normalized_expected)) < 0.01
+        except (ValueError, TypeError):
+            # Fall back to string comparison if conversion fails
+            amount_matches = str(extracted_amount) == str(normalized_expected)
         
         # Also check Gemini's direct answer about amount
         direct_amount_match = extracted_data.get('does_amount_match', False)
@@ -384,11 +416,109 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         print(f"Direct amount match from Gemini: {direct_amount_match}")
         print(f"Final amount match: {final_amount_match}")
         
+        # Get recipient details
+        recipient_upi = (
+            extracted_data.get('upi_id_recipient') or 
+            extracted_data.get('UPI ID of recipient') or 
+            ''
+        )
+        recipient_name = (
+            extracted_data.get('recipient_name') or
+            extracted_data.get('Name of recipient') or
+            ''
+        )
+
+        print(f"Extracted recipient UPI: {recipient_upi}")
+        print(f"Extracted recipient name: {recipient_name}")
+
+        # Check for either UPI ID or name match
+        recipient_upi_match = 'pran.eth@axl' in recipient_upi.lower() if recipient_upi else False
+        recipient_name_match = 'pranesh' in recipient_name.lower() if recipient_name else False
+
+        # Final recipient verification
+        recipient_verified = recipient_upi_match or recipient_name_match
+
+        # Also check Gemini's direct answer about recipient
+        recipient_match_keys = [
+            'recipient_match',
+            'does_recipient_match',
+            'is_recipient_matching'
+        ]
+
+        direct_recipient_match = False
+        for key in recipient_match_keys:
+            if key in extracted_data:
+                direct_recipient_match = extracted_data[key]
+                if direct_recipient_match:
+                    break
+                
+        # Check if comparison object exists and has recipient match
+        if 'comparison' in extracted_data and 'recipient_match' in extracted_data['comparison']:
+            direct_recipient_match = direct_recipient_match or extracted_data['comparison']['recipient_match']
+
+        # Final recipient verification result
+        final_recipient_verified = recipient_verified or direct_recipient_match
+
+        print(f"Recipient UPI match: {recipient_upi_match}")
+        print(f"Recipient name match: {recipient_name_match}")
+        print(f"Direct recipient match from Gemini: {direct_recipient_match}")
+        print(f"Final recipient verified: {final_recipient_verified}")
+        
         # Check payment status
         payment_successful = (
             'success' in (extracted_data.get('payment_status', '') or '').lower() or
             extracted_data.get('is_payment_successful', False)
         )
+        
+        # Parse and validate timestamp
+        timestamp_str = extracted_data.get('payment_timestamp') or extracted_data.get('Payment timestamp') or ''
+        timestamp_valid = False
+        
+        if timestamp_str and session_created_at:
+            try:
+                # Try different date formats
+                import re
+                from datetime import datetime
+                
+                # Clean the timestamp string (remove ordinal indicators like st, nd, rd, th)
+                cleaned_timestamp = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', timestamp_str)
+                
+                # Try different date formats commonly used in payment receipts
+                for date_format in [
+                    "%d %b %Y, %I:%M %p",      # 1 Apr 2025, 2:38 AM
+                    "%d %b %Y at %I:%M %p",    # 1 Apr 2025 at 2:38 AM
+                    "%d %b, %Y %I:%M %p",      # 1 Apr, 2025 2:38 AM
+                    "%d-%m-%Y %H:%M:%S",       # 01-04-2025 02:38:00
+                    "%d/%m/%Y %H:%M:%S",       # 01/04/2025 02:38:00
+                    "%Y-%m-%d %H:%M:%S"        # 2025-04-01 02:38:00
+                ]:
+                    try:
+                        payment_time = datetime.strptime(cleaned_timestamp, date_format)
+                        
+                        # Convert to timezone-aware datetime
+                        if timezone.is_naive(payment_time):
+                            payment_time = timezone.make_aware(payment_time)
+                        
+                        # Get current time
+                        now = timezone.now()
+                        
+                        print(f"Payment time: {payment_time}")
+                        print(f"Session created at: {session_created_at}")
+                        print(f"Current time: {now}")
+                        
+                        # Valid if: payment timestamp is after session creation and before now + 5 minutes
+                        timestamp_valid = (payment_time >= session_created_at and 
+                                          payment_time <= now + timezone.timedelta(minutes=5))
+                        
+                        if timestamp_valid:
+                            break
+                    except ValueError:
+                        continue
+                
+                print(f"Timestamp valid: {timestamp_valid}")
+            except Exception as e:
+                print(f"Error parsing timestamp: {str(e)}")
+                timestamp_valid = False
         
         # Prepare verification results
         verification_result = {
@@ -396,11 +526,14 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             'data': {
                 'transaction_id': extracted_data.get('transaction_id') or extracted_data.get('Transaction ID') or '',
                 'amount': amount_str,
-                'timestamp': extracted_data.get('payment_timestamp') or extracted_data.get('Payment timestamp') or '',
+                'timestamp': timestamp_str,
                 'sender_upi': extracted_data.get('upi_id_sender') or extracted_data.get('UPI ID of sender') or '',
+                'recipient_upi': recipient_upi,
+                'recipient_name': recipient_name,
                 'reference_code_matches': final_reference_match,
                 'amount_matches': final_amount_match,
-                'timestamp_valid': True,  # Simplified for now
+                'timestamp_valid': timestamp_valid,
+                'recipient_verified': final_recipient_verified,
                 'payment_successful': payment_successful
             }
         }
@@ -427,13 +560,57 @@ def create_payment_session(request):
     """Create a secure payment session without exposing reference code"""
     plan_id = request.data.get('plan_id')
     
+    logger.info(f"Creating payment session for plan_id: {plan_id}, type: {type(plan_id)}")
+    
+    # Define plan details to ensure consistent behavior regardless of database state
+    PLANS = {
+        1: {"name": "Basic", "credits": 3, "price": 49},
+        2: {"name": "Standard", "credits": 10, "price": 99}
+    }
+    
+    # Convert plan_id to int for consistency
     try:
+        plan_id = int(plan_id)
+    except (TypeError, ValueError):
+        logger.error(f"Invalid plan_id format: {plan_id}")
+        return Response({"error": "Invalid plan ID"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Check if plan_id is valid in our defined plans
+    if plan_id not in PLANS:
+        logger.error(f"Unknown plan_id: {plan_id}")
+        return Response({"error": "Unknown plan ID"}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get plan details from our definition
+    plan_details = PLANS[plan_id]
+    
+    try:
+        # Try to get plan from database first
         plan = PricingPlan.objects.get(id=plan_id, is_active=True)
+        logger.info(f"Found active plan in database: {plan.id} - {plan.name}")
     except PricingPlan.DoesNotExist:
-        return Response(
-            {"error": "Invalid or inactive pricing plan"}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
+        # Plan doesn't exist or is inactive - create/update it
+        logger.info(f"Plan {plan_id} not found or inactive - creating/updating")
+        try:
+            plan, created = PricingPlan.objects.update_or_create(
+                id=plan_id,
+                defaults={
+                    'name': plan_details['name'],
+                    'credits': plan_details['credits'],
+                    'price_inr': plan_details['price'],
+                    'price_usd': plan_details['price'] / 80,  # Rough INR to USD conversion
+                    'is_active': True
+                }
+            )
+            if created:
+                logger.info(f"Created new plan: {plan.id} - {plan.name}")
+            else:
+                logger.info(f"Updated existing plan: {plan.id} - {plan.name}")
+        except Exception as e:
+            logger.error(f"Error creating/updating plan: {str(e)}")
+            return Response(
+                {"error": "Failed to initialize pricing plan"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     # Generate unique reference code (8 characters)
     reference_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -444,49 +621,68 @@ def create_payment_session(request):
     upi_id = "pran.eth@axl"
     merchant_name = "Ghibliz"
     
-    # Create session with 7-minute expiry (changed from 5 minutes)
-    session = PaymentSession.objects.create(
-        user=request.user,
-        plan=plan,
-        amount=plan.price_inr,
-        reference_code=reference_code,
-        expires_at=timezone.now() + timedelta(minutes=7)
-    )
+    # Always use the price from our PLANS definition for consistency
+    amount = plan_details['price']
+    logger.info(f"Using price: {amount}")
     
-    # Generate UPI deep link with the reference code (hidden from frontend)
-    upi_link = f"upi://pay?pa={upi_id}&pn={merchant_name}&am={session.amount}&cu=INR&tn={reference_code}"
+    try:
+        # Create session with 7-minute expiry
+        session = PaymentSession.objects.create(
+            user=request.user,
+            plan=plan,
+            amount=amount,
+            reference_code=reference_code,
+            expires_at=timezone.now() + timedelta(minutes=7)
+        )
+        logger.info(f"Created session {session.id} with amount {session.amount}")
+    except Exception as e:
+        logger.error(f"Error creating session: {str(e)}")
+        return Response(
+            {"error": "Failed to create payment session"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
     
-    # Generate QR code for the UPI link
-    import qrcode
-    import base64
-    from io import BytesIO
+    # Generate UPI deep link with the reference code
+    upi_link = f"upi://pay?pa={upi_id}&pn={merchant_name}&am={amount}&cu=INR&tn={reference_code}"
     
-    qr = qrcode.QRCode(
-        version=1,
-        error_correction=qrcode.constants.ERROR_CORRECT_L,
-        box_size=10,
-        border=4,
-    )
-    qr.add_data(upi_link)
-    qr.make(fit=True)
-    
-    img = qr.make_image(fill_color="black", back_color="white")
-    
-    # Save QR code to bytes buffer and convert to base64 for embedding
-    buffer = BytesIO()
-    img.save(buffer, format="PNG")
-    qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
-    
-    # Return minimal info WITHOUT reference_code but WITH the UPI link and QR
-    return Response({
-        'session_id': session.id,
-        'amount': session.amount,
-        'plan_name': plan.name,
-        'expires_at': session.expires_at,
-        'upi_link': upi_link,
-        'qr_code_data': f"data:image/png;base64,{qr_code_base64}"
-    })
-
+    try:
+        # Generate QR code for the UPI link
+        import qrcode
+        import base64
+        from io import BytesIO
+        
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(upi_link)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Save QR code to bytes buffer and convert to base64 for embedding
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        qr_code_base64 = base64.b64encode(buffer.getvalue()).decode()
+        
+        # Return minimal info WITHOUT reference_code but WITH the UPI link and QR
+        response_data = {
+            'session_id': session.id,
+            'amount': amount,
+            'plan_name': plan_details['name'],
+            'expires_at': session.expires_at.isoformat(),
+            'upi_link': upi_link,
+            'qr_code_data': f"data:image/png;base64,{qr_code_base64}"
+        }
+        return Response(response_data)
+    except Exception as e:
+        logger.error(f"Error generating QR code: {str(e)}")
+        return Response(
+            {"error": "Failed to generate payment QR code"}, 
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
 
 
 @api_view(['GET'])

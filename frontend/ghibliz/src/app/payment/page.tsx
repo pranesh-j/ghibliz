@@ -2,13 +2,119 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, CreditCard, Loader2, QrCode, Smartphone, Upload, X, Info } from "lucide-react"
+import { ArrowLeft, CheckCircle2, CreditCard, Loader2, QrCode, Smartphone, Upload, X, Info, Copy, Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CloudBackground } from "@/components/cloud-background"
 import { GhibliLogo } from "@/components/ghibli-logo"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
 import api from "@/services/api"
+
+// Payment Timer Component
+const PaymentTimer = ({ expiresAt, onExpire }) => {
+  const [countdown, setCountdown] = useState(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!expiresAt) return;
+    
+    const calculateTimeLeft = () => {
+      const expiryTime = new Date(expiresAt).getTime();
+      const now = new Date().getTime();
+      return Math.max(0, Math.floor((expiryTime - now) / 1000));
+    };
+    
+    // Set initial countdown
+    setCountdown(calculateTimeLeft());
+    
+    // Update countdown every second
+    const timer = setInterval(() => {
+      const timeLeft = calculateTimeLeft();
+      setCountdown(timeLeft);
+      
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        
+        // Handle expiration
+        if (onExpire && typeof onExpire === 'function') {
+          onExpire();
+        } else {
+          // If no callback provided, reload the page
+          router.refresh();
+        }
+      }
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [expiresAt, onExpire, router]);
+  
+  // Format time as MM:SS
+  const formatTime = (seconds) => {
+    if (seconds === null) return '--:--';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  };
+  
+  return (
+    <div className="p-3 bg-blue-50 border border-blue-100 rounded-md mb-4">
+      <div className="flex items-start">
+        <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+        <div>
+          <p className="text-sm text-blue-700">
+            <span className="font-medium">
+              Time remaining to complete payment: {formatTime(countdown)}
+            </span>
+          </p>
+          <p className="text-xs text-blue-600 mt-1">
+            Please make payment and upload screenshot before time expires
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Reference Code Highlighter Component
+const ReferenceCodeHighlighter = ({ referenceCode }) => {
+  const [copied, setCopied] = useState(false);
+  
+  const handleCopy = () => {
+    navigator.clipboard.writeText(referenceCode);
+    setCopied(true);
+    
+    setTimeout(() => {
+      setCopied(false);
+    }, 2000);
+  };
+  
+  return (
+    <div className="mt-4 mb-4">
+      <p className="text-sm font-medium text-gray-700 mb-1">
+        Payment Reference Code (add to payment note):
+      </p>
+      <div className="flex items-center">
+        <div className="bg-amber-50 py-2 px-3 rounded-l border-l border-t border-b border-amber-200 flex-grow">
+          <code className="font-mono text-lg font-semibold tracking-wider">{referenceCode}</code>
+        </div>
+        <button
+          onClick={handleCopy}
+          className="bg-amber-100 hover:bg-amber-200 py-2 px-3 rounded-r border-r border-t border-b border-amber-200"
+          aria-label="Copy reference code"
+        >
+          {copied ? (
+            <Check className="h-5 w-5 text-green-600" />
+          ) : (
+            <Copy className="h-5 w-5 text-amber-700" />
+          )}
+        </button>
+      </div>
+      <p className="text-xs text-red-600 mt-2 font-medium">
+        Important: This exact code must be included in your payment note/reference field
+      </p>
+    </div>
+  );
+};
 
 // Updated interfaces
 interface PricingPlan {
@@ -26,6 +132,7 @@ interface PaymentSession {
   expires_at: string;
   upi_link: string;              // Direct UPI link from backend
   qr_code_data: string;          // Base64 encoded QR code image
+  reference_code?: string;       // Reference code (may be included from backend)
 }
 
 export default function PaymentPage() {
@@ -62,7 +169,21 @@ export default function PaymentPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [verificationComplete, setVerificationComplete] = useState(false)
-  const [countdown, setCountdown] = useState<number | null>(null)
+  
+  // Handle session expiration
+  const handleSessionExpired = () => {
+    toast({
+      title: "Session expired",
+      description: "Payment session has expired. Please create a new session.",
+      variant: "error"
+    });
+    
+    // Reset the payment state
+    setCurrentSession(null);
+    setVerificationComplete(false);
+    setScreenshot(null);
+    setPreviewUrl(null);
+  };
   
   // Create payment session
   const handleCreatePayment = async () => {
@@ -76,12 +197,6 @@ export default function PaymentPage() {
       });
       
       setCurrentSession(response.data);
-      
-      // Start the countdown (7 minutes)
-      const expiryTime = new Date(response.data.expires_at).getTime();
-      const now = new Date().getTime();
-      const timeLeft = Math.floor((expiryTime - now) / 1000);
-      setCountdown(timeLeft > 0 ? timeLeft : 0);
       
       toast({
         title: "Payment initialized",
@@ -99,23 +214,6 @@ export default function PaymentPage() {
       setCreatingPayment(false)
     }
   }
-  
-  // Update countdown timer
-  useEffect(() => {
-    if (countdown === null || countdown <= 0) return;
-    
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev === null || prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [countdown]);
   
   // Handle screenshot upload
   const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -197,21 +295,12 @@ export default function PaymentPage() {
     }
   }
   
-  // Format countdown time
-  const formatCountdown = (seconds: number | null) => {
-    if (seconds === null) return '';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  }
-  
   // Reset the payment process
   const handleReset = () => {
     setCurrentSession(null)
     setVerificationComplete(false)
     setScreenshot(null)
     setPreviewUrl(null)
-    setCountdown(null)
   }
   
   // Go back to home page
@@ -348,7 +437,7 @@ export default function PaymentPage() {
                       <div className="flex justify-between mb-2">
                         <span className="text-sm text-ghibli-dark/80">Package:</span>
                         <span className="text-sm font-medium text-ghibli-dark">
-                          {selectedPlan?.name} ({selectedPlan?.credits} credits)
+                          {currentSession?.plan_name} ({selectedPlan?.credits} credits)
                         </span>
                       </div>
                       <div className="flex justify-between mb-2">
@@ -365,21 +454,17 @@ export default function PaymentPage() {
                       </div>
                     </div>
                     
-                    {/* Countdown Timer */}
-                    {countdown !== null && (
-                      <div className="mb-4 p-3 bg-blue-50 border border-blue-100 rounded-md">
-                        <div className="flex items-start">
-                          <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-                          <div>
-                            <p className="text-sm text-blue-700">
-                              <span className="font-medium">Time remaining to complete payment: {formatCountdown(countdown)}</span>
-                            </p>
-                            <p className="text-xs text-blue-600 mt-1">
-                              Please make payment and upload screenshot before time expires
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                    {/* Payment Timer - UPDATED */}
+                    {currentSession && (
+                      <PaymentTimer 
+                        expiresAt={currentSession.expires_at}
+                        onExpire={handleSessionExpired}
+                      />
+                    )}
+                    
+                    {/* Reference Code Highlighter - NEW */}
+                    {currentSession && currentSession.reference_code && (
+                      <ReferenceCodeHighlighter referenceCode={currentSession.reference_code} />
                     )}
                     
                     {/* Payment Method Toggle */}
@@ -585,11 +670,11 @@ export default function PaymentPage() {
                             Screenshot Guide:
                           </p>
                           <p className="text-xs text-ghibli-dark/80 mb-2">
-                            Please capture the entire payment confirmation screen without hiding any important details such as transaction ID etc.
+                            Please capture the entire payment confirmation screen without hiding any important details such as transaction ID, payment note, and amount.
                           </p>
                           <p className="text-xs text-ghibli-dark/80 mt-2 font-medium">
-  <span className="text-blue-700">Important: Do not crop your screenshots as verification will fail for any cropped out screenshots. We don't store your screenshots after verification.</span>
-</p>
+                            <span className="text-blue-700">Important: Do not crop your screenshots as verification will fail for any cropped out screenshots. We don't store your screenshots after verification.</span>
+                          </p>
                         </div>
                       </div>
                       
@@ -597,7 +682,7 @@ export default function PaymentPage() {
                         <Button
                           className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-medium"
                           onClick={handleVerifyPayment}
-                          disabled={submittingVerification || !screenshot || countdown === 0}
+                          disabled={submittingVerification || !screenshot}
                         >
                           {submittingVerification ? (
                             <>
