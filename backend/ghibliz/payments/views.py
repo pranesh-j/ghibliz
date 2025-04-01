@@ -13,6 +13,7 @@ from django.utils import timezone
 from datetime import timedelta
 from django.conf import settings
 from django.http import HttpResponse
+from django.views.decorators.cache import cache_page
 
 
 class CreatePaymentView(views.APIView):
@@ -82,6 +83,7 @@ class VerifyPaymentView(views.APIView):
         
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
+@cache_page(60 * 15)  # Cache for 15 minutes
 def get_pricing_plans(request):
     """Get all active pricing plans"""
     plans = PricingPlan.objects.filter(is_active=True)
@@ -214,6 +216,8 @@ def verify_payment(request, session_id):
         profile = request.user.profile
         profile.credit_balance += session.plan.credits
         profile.save()
+
+        cache.delete(f'user_profile_{request.user.id}')
         
         # Mark session as completed
         session.status = 'completed'
@@ -232,6 +236,10 @@ def verify_payment(request, session_id):
         return Response({
             "error": "We encountered a problem processing your payment verification. Please try again or contact support."
         }, status=500)
+
+
+
+
 
 def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount, session_created_at=None):
     """
@@ -560,13 +568,7 @@ def create_payment_session(request):
     """Create a secure payment session without exposing reference code"""
     plan_id = request.data.get('plan_id')
     
-    logger.info(f"Creating payment session for plan_id: {plan_id}, type: {type(plan_id)}")
-    
-    # Define plan details to ensure consistent behavior regardless of database state
-    PLANS = {
-        1: {"name": "Basic", "credits": 3, "price": 49},
-        2: {"name": "Standard", "credits": 10, "price": 99}
-    }
+    logger.info(f"Creating payment session for plan_id: {plan_id}")
     
     # Convert plan_id to int for consistency
     try:
@@ -575,42 +577,16 @@ def create_payment_session(request):
         logger.error(f"Invalid plan_id format: {plan_id}")
         return Response({"error": "Invalid plan ID"}, status=status.HTTP_400_BAD_REQUEST)
     
-    # Check if plan_id is valid in our defined plans
-    if plan_id not in PLANS:
-        logger.error(f"Unknown plan_id: {plan_id}")
-        return Response({"error": "Unknown plan ID"}, status=status.HTTP_400_BAD_REQUEST)
-    
-    # Get plan details from our definition
-    plan_details = PLANS[plan_id]
-    
     try:
-        # Try to get plan from database first
+        # Get the plan from the database
         plan = PricingPlan.objects.get(id=plan_id, is_active=True)
         logger.info(f"Found active plan in database: {plan.id} - {plan.name}")
     except PricingPlan.DoesNotExist:
-        # Plan doesn't exist or is inactive - create/update it
-        logger.info(f"Plan {plan_id} not found or inactive - creating/updating")
-        try:
-            plan, created = PricingPlan.objects.update_or_create(
-                id=plan_id,
-                defaults={
-                    'name': plan_details['name'],
-                    'credits': plan_details['credits'],
-                    'price_inr': plan_details['price'],
-                    'price_usd': plan_details['price'] / 80,  # Rough INR to USD conversion
-                    'is_active': True
-                }
-            )
-            if created:
-                logger.info(f"Created new plan: {plan.id} - {plan.name}")
-            else:
-                logger.info(f"Updated existing plan: {plan.id} - {plan.name}")
-        except Exception as e:
-            logger.error(f"Error creating/updating plan: {str(e)}")
-            return Response(
-                {"error": "Failed to initialize pricing plan"}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+        logger.error(f"Plan {plan_id} not found or inactive")
+        return Response(
+            {"error": "Selected pricing plan not found or is inactive"}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
     
     # Generate unique reference code (8 characters)
     reference_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
@@ -621,9 +597,9 @@ def create_payment_session(request):
     upi_id = "pran.eth@axl"
     merchant_name = "Ghibliz"
     
-    # Always use the price from our PLANS definition for consistency
-    amount = plan_details['price']
-    logger.info(f"Using price: {amount}")
+    # Use the price from the database plan
+    amount = plan.price_inr
+    logger.info(f"Using price from database: {amount}")
     
     try:
         # Create session with 7-minute expiry
@@ -671,7 +647,7 @@ def create_payment_session(request):
         response_data = {
             'session_id': session.id,
             'amount': amount,
-            'plan_name': plan_details['name'],
+            'plan_name': plan.name,
             'expires_at': session.expires_at.isoformat(),
             'upi_link': upi_link,
             'qr_code_data': f"data:image/png;base64,{qr_code_base64}"
@@ -683,7 +659,6 @@ def create_payment_session(request):
             {"error": "Failed to generate payment QR code"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
-
 
 @api_view(['GET'])
 def redirect_to_upi(request, session_id):

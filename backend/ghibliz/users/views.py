@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer
-
+from django.core.cache import cache
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -31,12 +31,26 @@ class RegisterView(generics.CreateAPIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+
 class UserProfileView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
     
     def get_object(self):
-        return self.request.user
+        # Try to get cached profile first
+        cache_key = f'user_profile_{self.request.user.id}'
+        cached_profile = cache.get(cache_key)
+        
+        if cached_profile:
+            return cached_profile
+        
+        # If not in cache, get from database
+        user = self.request.user
+        
+        # Cache for 10 minutes - we don't want to cache too long as credit balance might change
+        cache.set(cache_key, user, 60 * 10)
+        
+        return user
 
 
 class LogoutView(APIView):

@@ -113,65 +113,71 @@ def transform_image_to_ghibli(image_file):
 
 
 # Updated watermarking function with padding defined and simpler watermark
-def create_watermarked_preview(image_file):
+
+def create_watermarked_preview(image_file, apply_watermark=True):
     """
-    Add a watermark to the image for preview purposes
+    Add a watermark to the image for preview purposes if apply_watermark is True,
+    otherwise just convert to a proper format
     
     Args:
         image_file: A file-like object containing the image data
+        apply_watermark: Whether to apply the watermark (default: True)
         
     Returns:
-        BytesIO: A BytesIO object containing the watermarked image
+        BytesIO: A BytesIO object containing the image (watermarked if apply_watermark is True)
     """
     try:
         # Open the image
         img = Image.open(image_file)
         img = img.convert('RGBA')
         
-        # Create a transparent overlay
-        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-        
-        # Get dimensions
-        width, height = img.size
-        
-        # Try to load a font
-        try:
-            from PIL import ImageFont
-            font_size = max(16, min(width, height) // 20)  # Responsive font size
-            font = ImageFont.truetype("arial.ttf", font_size)
-        except Exception:
-            font = None
-        
-        # Watermark text
-        text = "Ghibliz"
-        
-        # Calculate padding - DEFINE THIS VARIABLE BEFORE USING IT
-        padding = max(10, min(width, height) // 30)
-        
-        # Only add watermark to bottom right corner
-        position = (width - padding - len(text)*font_size//2, height - padding - font_size)
-        
-        # Draw watermark with low opacity
-        draw.text(position, text, fill=(255, 255, 255, 75), font=font)
-        
-        # Composite the image with the overlay
-        watermarked = Image.alpha_composite(img, overlay)
-        
-        # Convert back to RGB for JPEG
-        watermarked = watermarked.convert('RGB')
+        if apply_watermark:
+            # Create a transparent overlay
+            overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+            draw = ImageDraw.Draw(overlay)
+            
+            # Get dimensions
+            width, height = img.size
+            
+            # Try to load a font
+            try:
+                from PIL import ImageFont
+                font_size = max(16, min(width, height) // 20)  # Responsive font size
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except Exception:
+                font = None
+            
+            # Watermark text
+            text = "Ghibli.art"  # Updated watermark text
+            
+            # Calculate padding 
+            padding = max(10, min(width, height) // 30)
+            
+            # Position at bottom-left corner
+            position = (padding, height - padding - font_size)
+            
+            # Draw watermark with low opacity
+            draw.text(position, text, fill=(255, 255, 255, 75), font=font)
+            
+            # Composite the image with the overlay
+            watermarked = Image.alpha_composite(img, overlay)
+            
+            # Convert back to RGB for JPEG
+            result_img = watermarked.convert('RGB')
+        else:
+            # No watermark needed, just convert to RGB for JPEG
+            result_img = img.convert('RGB')
         
         # Save to BytesIO
         result = BytesIO()
-        watermarked.save(result, format='JPEG', quality=95)
+        result_img.save(result, format='JPEG', quality=95)
         result.seek(0)
         
         return result
         
     except Exception as e:
-        logger.error(f"Error creating watermarked preview: {str(e)}")
-        raise Exception(f"Failed to create watermarked preview: {str(e)}")
-
+        logger.error(f"Error creating image preview: {str(e)}")
+        raise Exception(f"Failed to create image preview: {str(e)}")
 
 def test_openai_connection():
     """

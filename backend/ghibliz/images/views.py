@@ -14,6 +14,8 @@ from .models import GeneratedImage
 from .services import transform_image_to_ghibli, create_watermarked_preview
 from users.models import UserProfile
 
+from django.views.decorators.cache import cache_page
+
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -34,18 +36,22 @@ class ImageTransformAPIView(views.APIView):
         user_profile = None
         
         # Check if user is authenticated
+        is_free_transform = False  # Default: not a free transform
         if request.user.is_authenticated:
             user = request.user
             # Check if user has credits or has not used free transform
             user_profile = UserProfile.objects.get(user=user)
             
-            if not user_profile.free_transform_used:
-                user_profile.free_transform_used = True
-                user_profile.save()
+            # Determine if this is a free transform
+            is_free_transform = not user_profile.free_transform_used
+            
+            if is_free_transform:
+                # Mark as used after successful transform 
+                # (We'll do the actual update after transformation succeeds)
+                pass
             elif user_profile.credit_balance > 0:
-                # Paid transform, deduct a credit
-                user_profile.credit_balance -= 1
-                user_profile.save()
+                # Paid transform, will deduct a credit after successful transform
+                pass
             else:
                 return Response(
                     {"error": "No credits available. Please purchase credits to continue."}, 
@@ -56,11 +62,24 @@ class ImageTransformAPIView(views.APIView):
             # Transform the image using OpenAI
             transformed_image = transform_image_to_ghibli(image_file)
             
-            # Create the watermarked preview for unpaid images
-            preview_image = create_watermarked_preview(transformed_image)
+            # Create the preview image (with watermark only if it's a free transform)
+            preview_image = create_watermarked_preview(transformed_image, apply_watermark=is_free_transform)
             
-            # Reset file position after reading
+            # Reset file positions after reading
             transformed_image.seek(0)
+            
+            # Update user profile if authenticated
+            if user_profile:
+                if is_free_transform:
+                    user_profile.free_transform_used = True
+                    user_profile.save()
+                elif user_profile.credit_balance > 0:
+                    user_profile.credit_balance -= 1
+                    user_profile.save()
+                
+                # Invalidate the cache after profile update
+                from django.core.cache import cache
+                cache.delete(f'user_profile_{user.id}')
             
             # Create response data placeholder
             response_data = {}
@@ -72,7 +91,7 @@ class ImageTransformAPIView(views.APIView):
                 generated_image.user = user
                 
                 # If user paid (used credit), mark as paid
-                if user_profile and (not user_profile.free_transform_used or user_profile.credit_balance >= 0):
+                if user_profile and (not is_free_transform or user_profile.credit_balance >= 0):
                     generated_image.is_paid = True
                 
                 # Save images to model (using ContentFile to convert BytesIO to Django File)
@@ -127,8 +146,10 @@ class ImageTransformAPIView(views.APIView):
             )
 
 
+
 @api_view(['GET'])
 @permission_classes([AllowAny])
+@cache_page(60 * 10)  # Cache for 10 minutes
 def recent_images(request):
     """Get recent public transformed images"""
     limit = int(request.query_params.get('limit', 6))

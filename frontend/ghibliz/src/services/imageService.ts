@@ -1,34 +1,26 @@
-// src/services/imageService.ts
-import api from './api';
+// frontend/ghibliz/src/services/imageService.ts
 
-export interface GeneratedImage {
-  id: number;
-  image_url: string | null;
-  preview_url: string | null;
-  is_paid: boolean;
-  created_at: string;
-  download_token?: string;
-  token_expires_at?: string;
-}
+import { api } from './api';
 
-export interface ShareResponse {
-  share_url: string;
-  expires_at: string;
-}
-
+// Define the RecentImage interface
 export interface RecentImage {
   id: number;
   original: string;
   processed: string;
 }
 
+// Create the service object
 const ImageService = {
-  // Transform an image to Ghibli style
-  transformImage: async (imageFile: File): Promise<GeneratedImage> => {
+  /**
+   * Transforms an image using the backend API
+   * @param imageFile - The image file to transform
+   * @returns The transformed image data
+   */
+  async transformImage(imageFile: File) {
     const formData = new FormData();
     formData.append('image', imageFile);
     
-    const response = await api.post<GeneratedImage>('/transform/', formData, {
+    const response = await api.post('/transform/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -37,58 +29,48 @@ const ImageService = {
     return response.data;
   },
   
-  // Get user's transformed images
-  getUserImages: async (): Promise<GeneratedImage[]> => {
-    const response = await api.get<GeneratedImage[]>('/images/user/');
-    return response.data;
-  },
-  
-  // Get recent public images
-  getRecentImages: async (limit: number = 6): Promise<RecentImage[]> => {
-    const response = await api.get<RecentImage[]>(`/images/recent/?limit=${limit}`);
-    return response.data;
-  },
-  
-  // Download a transformed image
-  downloadImage: async (imageId: number, token: string): Promise<Blob> => {
-    const response = await api.get(`/images/${imageId}/download/?token=${token}`, {
-      responseType: 'blob',
-    });
-    
-    return response.data;
-  },
-  
-  // Download an image with auto download
-  downloadAndSaveImage: async (imageId: number, token: string): Promise<boolean> => {
+  /**
+   * Fetches recent transformed images from the backend
+   * @param limit - The number of images to fetch (default: 6)
+   * @returns Array of image data objects
+   */
+  async getRecentImages(limit: number = 6) {
     try {
-      const blob = await ImageService.downloadImage(imageId, token);
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `ghiblified-image-${imageId}.jpg`;
-      document.body.appendChild(link);
-      
-      // Trigger download
-      link.click();
-      
-      // Cleanup
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(link);
-      
-      return true;
+      const response = await api.get(`/images/recent/?limit=${limit}`);
+      return response.data;
     } catch (error) {
-      console.error('Download failed:', error);
-      throw error;
+      console.error('Error fetching recent images:', error);
+      return [];
     }
   },
   
-  // Generate shareable link
-  shareImage: async (imageId: number): Promise<ShareResponse> => {
-    const response = await api.post<ShareResponse>(`/images/${imageId}/share/`);
-    return response.data;
+  /**
+   * Fetches images transformed by the current user (requires authentication)
+   * @returns Array of user's transformed images
+   */
+  async getUserImages() {
+    try {
+      const response = await api.get('/user/images/');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user images:', error);
+      return [];
+    }
+  },
+  
+  /**
+   * Downloads a transformed image using the provided token
+   * @param imageId - The ID of the image to download
+   * @param token - The download token
+   * @returns URL to download the image
+   */
+  getDownloadUrl(imageId: number, token: string) {
+    return `${api.defaults.baseURL}/download/${imageId}/?token=${token}`;
   }
 };
 
+// Export both as named export for new code
+export const imageService = ImageService;
+
+// Export as default for backward compatibility
 export default ImageService;

@@ -1,136 +1,76 @@
-"use client"
+// frontend/ghibliz/src/components/infinite-scroll-gallery.tsx
 
-import { useRef, useEffect, useState } from "react"
-import { motion } from "framer-motion"
-import { cn } from "@/lib/utils"
+import React, { useEffect, useState, memo } from 'react';
+import { imageService } from '@/services/imageService';
 
-interface GalleryItem {
-  id: number
-  original: string
-  processed: string
-}
+// Memoized image component to prevent unnecessary re-renders
+const GalleryImage = memo(({ src, alt }: { src: string; alt: string }) => (
+  <div className="relative aspect-square overflow-hidden rounded-md">
+    <img 
+      src={src} 
+      alt={alt}
+      className="object-cover w-full h-full transition-transform hover:scale-105"
+      loading="lazy" /* Add lazy loading */
+    />
+  </div>
+));
 
-interface InfiniteScrollGalleryProps {
-  items: GalleryItem[]
-  className?: string
-}
+GalleryImage.displayName = 'GalleryImage';
 
-export function InfiniteScrollGallery({ items, className }: InfiniteScrollGalleryProps) {
-  const [containerWidth, setContainerWidth] = useState(0)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Duplicate items for seamless looping
-  const duplicatedItems = [...items, ...items, ...items]
+export default function InfiniteScrollGallery() {
+  const [images, setImages] = useState<{ original: string; processed: string; id: number }[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth)
+    const fetchImages = async () => {
+      try {
+        setLoading(true);
+        // Fetch exactly 20 images at once instead of multiple small fetches
+        const data = await imageService.getRecentImages(20);
+        setImages(data);
+      } catch (error) {
+        console.error('Error fetching images:', error);
+      } finally {
+        setLoading(false);
       }
-    }
+    };
 
-    // Initial width calculation
-    updateWidth()
+    fetchImages();
+  }, []);
 
-    // Update on resize
-    window.addEventListener("resize", updateWidth)
-    return () => window.removeEventListener("resize", updateWidth)
-  }, [])
-
-  // Calculate item width based on screen size
-  const getItemWidth = () => {
-    if (typeof window !== "undefined") {
-      if (window.innerWidth < 640) return 250 // Mobile
-      if (window.innerWidth < 1024) return 300 // Tablet
-      return 350 // Desktop
-    }
-    return 300 // Default
+  if (loading) {
+    return <div className="flex justify-center p-4">Loading gallery...</div>;
   }
 
-  const itemWidth = getItemWidth()
-  const totalWidth = duplicatedItems.length * (itemWidth + 16) // width + gap
-
-  // Calculate animation duration based on number of items
-  const duration = items.length * 20 // seconds
+  // Split images into two rows for the marquee effect
+  const upperRowImages = [...images.slice(0, 10), ...images.slice(0, 10)]; // Duplicate first 10 to create loop
+  const lowerRowImages = [...images.slice(10, 20), ...images.slice(10, 20)]; // Duplicate last 10 to create loop
 
   return (
-    <div className={cn("relative w-full overflow-hidden", className)} ref={containerRef}>
-      {/* Top row - moving left */}
-      <div className="relative w-full overflow-hidden mb-6 h-[220px]">
-        {/* Fade overlay - left */}
-        <div className="absolute left-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-r from-ghibli-cream/30 to-transparent pointer-events-none" />
-
-        <motion.div
-          className="flex gap-4"
-          initial={{ x: 0 }}
-          animate={{ x: -totalWidth / 2 }}
-          transition={{
-            duration,
-            repeat: Number.POSITIVE_INFINITY,
-            ease: "linear",
-            repeatType: "loop",
-          }}
-          style={{ width: totalWidth }}
-        >
-          {duplicatedItems.map((item, index) => (
-            <div
-              key={`top-${item.id}-${index}`}
-              className="shrink-0 bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-md"
-              style={{ width: itemWidth }}
-            >
-              <div className="aspect-[4/3] relative overflow-hidden">
-                <img
-                  src={item.original || "/placeholder.svg?height=300&width=400"}
-                  alt={`Original ${item.id}`}
-                  className="w-full h-full object-cover transition-transform hover:scale-105 duration-500"
-                />
-              </div>
+    <div className="w-full overflow-hidden py-8">
+      <h2 className="text-center text-xl font-bold mb-4">Latest Transformations</h2>
+      
+      {/* Upper row - moves left */}
+      <div className="relative w-full overflow-hidden mb-4">
+        <div className="flex animate-marquee">
+          {upperRowImages.map((image, index) => (
+            <div key={`upper-${image.id}-${index}`} className="w-64 flex-shrink-0 p-2">
+              <GalleryImage src={image.processed} alt="Transformed image" />
             </div>
           ))}
-        </motion.div>
-
-        {/* Fade overlay - right */}
-        <div className="absolute right-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-l from-ghibli-cream/30 to-transparent pointer-events-none" />
+        </div>
       </div>
-
-      {/* Bottom row - moving right */}
-      <div className="relative w-full overflow-hidden h-[220px]">
-        {/* Fade overlay - left */}
-        <div className="absolute left-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-r from-ghibli-cream/30 to-transparent pointer-events-none" />
-
-        <motion.div
-          className="flex gap-4"
-          initial={{ x: -totalWidth / 2 }}
-          animate={{ x: 0 }}
-          transition={{
-            duration,
-            repeat: Number.POSITIVE_INFINITY,
-            ease: "linear",
-            repeatType: "loop",
-          }}
-          style={{ width: totalWidth }}
-        >
-          {duplicatedItems.map((item, index) => (
-            <div
-              key={`bottom-${item.id}-${index}`}
-              className="shrink-0 bg-white/90 backdrop-blur-sm rounded-2xl overflow-hidden shadow-md"
-              style={{ width: itemWidth }}
-            >
-              <div className="aspect-[4/3] relative overflow-hidden">
-                <img
-                  src={item.processed || "/placeholder.svg?height=300&width=400"}
-                  alt={`Processed ${item.id}`}
-                  className="w-full h-full object-cover transition-transform hover:scale-105 duration-500"
-                />
-              </div>
+      
+      {/* Lower row - moves right */}
+      <div className="relative w-full overflow-hidden">
+        <div className="flex animate-marquee-reverse">
+          {lowerRowImages.map((image, index) => (
+            <div key={`lower-${image.id}-${index}`} className="w-64 flex-shrink-0 p-2">
+              <GalleryImage src={image.processed} alt="Transformed image" />
             </div>
           ))}
-        </motion.div>
-
-        {/* Fade overlay - right */}
-        <div className="absolute right-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-l from-ghibli-cream/30 to-transparent pointer-events-none" />
+        </div>
       </div>
     </div>
-  )
+  );
 }
-
