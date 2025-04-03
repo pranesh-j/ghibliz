@@ -1,64 +1,76 @@
-// src/services/authService.ts
-import api from './api';
+import api from './api'; // Your configured Axios instance
 
-export interface UserProfile {
-  free_transform_used: boolean;
-  credit_balance: number;
-  created_at: string;
+interface GoogleLoginResponse {
+    access: string;
+    refresh: string;
+    user: {
+        id: number;
+        username: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        profile: {
+            credit_balance: number;
+            free_transform_used: boolean;
+        };
+    };
 }
 
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  first_name?: string;
-  last_name?: string;
-  profile: UserProfile;
+// Define the structure of the user profile response
+interface UserProfileResponse {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    profile: {
+        credit_balance: number;
+        free_transform_used: boolean;
+    };
 }
 
-export interface LoginResponse {
-  access: string;
-  refresh: string;
-}
 
-const AuthService = {  
-  // Google OAuth login
-  googleLogin: async (idToken: string): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/google-login/', { id_token: idToken });
-    
-    // Store tokens
-    const { access, refresh } = response.data;
-    localStorage.setItem('access_token', access);
-    localStorage.setItem('refresh_token', refresh);
-    
-    return response.data;
-  },
-  
-  // Get current user profile
-  getCurrentUser: async (): Promise<User> => {
-    const response = await api.get<User>('/profile/');
-    return response.data;
-  },
-  
-  // Logout user
-  logout: async (): Promise<void> => {
-    try {
-      const refreshToken = localStorage.getItem('refresh_token');
-      if (refreshToken) {
-        await api.post('/logout/', { refresh_token: refreshToken });
-      }
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-    }
-  },
-  
-  // Check if user is authenticated
-  isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('access_token');
-  }
+const authService = {
+    // Google Login
+    googleLogin: async (idToken: string): Promise<GoogleLoginResponse> => {
+        try {
+            // --- FIX: Removed leading /api/ ---
+            const response = await api.post<GoogleLoginResponse>('google-login/', {
+                id_token: idToken,
+            });
+            console.log("authService: Google login API success:", response.data); // Debug log
+            return response.data;
+        } catch (error: any) {
+            console.error("authService: Google login API error:", error.response?.data || error.message); // Log specific error
+            throw error; // Re-throw the error to be handled by the caller
+        }
+    },
+
+    // Fetch user profile
+    getProfile: async (): Promise<UserProfileResponse> => {
+        try {
+            // --- FIX: Removed leading /api/ ---
+            const response = await api.get<UserProfileResponse>('profile/');
+            // console.log("authService: Profile fetched:", response.data); // Debug log
+            return response.data;
+        } catch (error: any) {
+            console.error("authService: Get profile API error:", error.response?.data || error.message); // Log specific error
+            throw error;
+        }
+    },
+
+    // --- Example: Add logout if needed ---
+    // logout: async (): Promise<void> => {
+    //    const refreshToken = localStorage.getItem('refresh_token');
+    //    if (!refreshToken) return; // No need to call backend if no refresh token
+    //    try {
+    //        // --- FIX: Removed leading /api/ ---
+    //        await api.post('logout/', { refresh_token: refreshToken });
+    //    } catch (error) {
+    //        console.error("Logout API error:", error);
+    //        // Decide how to handle logout errors, maybe ignore?
+    //    }
+    //},
 };
 
-export default AuthService;
+export default authService;

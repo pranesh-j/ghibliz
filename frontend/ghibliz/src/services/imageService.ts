@@ -1,76 +1,105 @@
-// frontend/ghibliz/src/services/imageService.ts
+// src/services/imageService.ts
+import api from './api';
 
-import { api } from './api';
-
-// Define the RecentImage interface
 export interface RecentImage {
-  id: number;
-  original: string;
-  processed: string;
+    id: number;
+    original: string | null;
+    processed: string | null;
 }
 
-// Create the service object
+interface ImageTransformResponse {
+    id?: number; // May not exist for anonymous
+    image_url: string | null;
+    preview_url: string | null;
+    is_paid: boolean;
+    created_at: string;
+    download_token?: string; // Only for authenticated/paid
+    updated_credit_balance?: number; // Added based on backend changes
+    // Add other fields if your backend returns more
+}
+
+interface ShareResponse {
+    share_url: string;
+}
+
 const ImageService = {
-  /**
-   * Transforms an image using the backend API
-   * @param imageFile - The image file to transform
-   * @returns The transformed image data
-   */
-  async transformImage(imageFile: File) {
-    const formData = new FormData();
-    formData.append('image', imageFile);
-    
-    const response = await api.post('/transform/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    
-    return response.data;
-  },
-  
-  /**
-   * Fetches recent transformed images from the backend
-   * @param limit - The number of images to fetch (default: 6)
-   * @returns Array of image data objects
-   */
-  async getRecentImages(limit: number = 6) {
-    try {
-      const response = await api.get(`/images/recent/?limit=${limit}`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching recent images:', error);
-      return [];
-    }
-  },
-  
-  /**
-   * Fetches images transformed by the current user (requires authentication)
-   * @returns Array of user's transformed images
-   */
-  async getUserImages() {
-    try {
-      const response = await api.get('/user/images/');
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching user images:', error);
-      return [];
-    }
-  },
-  
-  /**
-   * Downloads a transformed image using the provided token
-   * @param imageId - The ID of the image to download
-   * @param token - The download token
-   * @returns URL to download the image
-   */
-  getDownloadUrl(imageId: number, token: string) {
-    return `${api.defaults.baseURL}/download/${imageId}/?token=${token}`;
-  }
+    // Transform image
+    transformImage: async (imageFile: File): Promise<ImageTransformResponse> => {
+        const formData = new FormData();
+        formData.append('image', imageFile);
+
+        try {
+            // --- FIX: Removed leading /api/ ---
+            const response = await api.post<ImageTransformResponse>('transform/', formData); // Content-Type is set by interceptor
+            return response.data;
+        } catch (error: any) {
+            console.error("Image transform API error:", error.response?.data || error.message);
+             // Re-throw the error to allow the calling component (page.tsx) to handle specific status codes (like 402)
+             throw error;
+        }
+    },
+
+    // Get recent images
+    getRecentImages: async (limit: number = 6): Promise<RecentImage[]> => {
+        try {
+            // --- FIX: Removed leading /api/ ---
+            const response = await api.get<RecentImage[]>(`images/recent/?limit=${limit}`);
+            return response.data;
+        } catch (error) {
+            console.error("Get recent images API error:", error);
+            // Return empty array or throw error based on how you want to handle this
+            return [];
+        }
+    },
+
+    // Download image (if using backend endpoint)
+    downloadImage: async (imageId: number, token: string): Promise<Blob> => {
+        try {
+            // --- FIX: Removed leading /api/ ---
+            // Adjust the endpoint if needed, e.g., 'images/download/{imageId}/?token={token}'
+            const response = await api.get<Blob>(`images/download/${imageId}/?token=${token}`, {
+                responseType: 'blob', // Important: expect binary data
+            });
+            return response.data;
+        } catch (error) {
+            console.error("Download image API error:", error);
+            throw error;
+        }
+    },
+
+    // Helper to trigger download in browser
+    downloadAndSaveImage: async (imageId: number, token: string, filename?: string) => {
+        try {
+            const blob = await ImageService.downloadImage(imageId, token);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename || `ghiblified-image-${imageId}.jpg`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url); // Clean up memory
+        } catch (error) {
+            console.error("Failed to download and save image:", error);
+            throw error; // Re-throw to be caught by UI
+        }
+    },
+
+
+    // Share image (example, if backend provides a share URL)
+    shareImage: async (imageId: number): Promise<ShareResponse> => {
+        try {
+             // --- FIX: Removed leading /api/ ---
+             // Replace with your actual share endpoint if you have one
+            const response = await api.post<ShareResponse>(`images/${imageId}/share/`, {}); // Example POST
+            // Or GET if it just retrieves a URL:
+            // const response = await api.get<ShareResponse>(`/api/images/${imageId}/share/`);
+            return response.data;
+        } catch (error) {
+            console.error("Share image API error:", error);
+            throw error;
+        }
+    },
 };
 
-// Export both as named export for new code
-export const imageService = ImageService;
-
-// Export as default for backward compatibility
 export default ImageService;
