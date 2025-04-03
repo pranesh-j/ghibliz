@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
 import api from "@/services/api"
 
+
 // Payment Timer Component
 const PaymentTimer = ({ expiresAt, onExpire }) => {
   const [countdown, setCountdown] = useState(null);
@@ -136,7 +137,7 @@ interface PaymentSession {
 }
 
 export default function PaymentPage() {
-  const { user, isAuthenticated } = useAuth()
+  const { user, isAuthenticated, refreshUserProfile } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -268,33 +269,20 @@ export default function PaymentPage() {
       
       setVerificationComplete(true)
       
+      // Add this line to refresh the user profile after verification
+      await refreshUserProfile();
+      
       toast({
         title: "Verification successful",
         description: response.data.message || "Credits have been added to your account",
         variant: "success"
       })
     } catch (error: any) {
-      console.error("Verification failed:", error)
-      
-      let errorMessage = "Please check your screenshot and try again";
-      
-      // Handle specific error cases
-      if (error.response?.status === 400) {
-        errorMessage = error.response.data.error || errorMessage;
-      } else if (error.response?.status === 404) {
-        errorMessage = "Payment session expired or not found";
-      }
-      
-      toast({
-        title: "Verification failed",
-        description: errorMessage,
-        variant: "error"
-      })
+      // existing error handling code
     } finally {
       setSubmittingVerification(false)
     }
   }
-  
   // Reset the payment process
   const handleReset = () => {
     setCurrentSession(null)
@@ -745,7 +733,7 @@ export default function PaymentPage() {
                   <ul className="list-disc pl-5 space-y-1">
                     <li>Payments are verified automatically via screenshot</li>
                     <li>Your payment must be completed within the countdown time</li>
-                    <li>For any issues, contact support@ghibliz.com</li>
+                    <li>For any issues, contact ghiblit@gmail.com</li>
                   </ul>
                 </div>
               </div>

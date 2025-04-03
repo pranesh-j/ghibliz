@@ -102,15 +102,9 @@ class GoogleLoginView(APIView):
                     last_name=family_name,
                 )
                 logger.info(f"Created new user for {email}")
-                # Profile will be created by the signal, but we note this
 
-            # Get or create user profile
-            # The signal users/models.py handles profile creation automatically
-            # We fetch it here to determine if it's brand new
             profile, created = UserProfile.objects.get_or_create(user=user)
             profile_created = created # Store if the profile was just made
-
-            # --- CHANGE: Grant 1 credit ONLY if the profile was newly created ---
 
             if profile_created:
                 profile.credit_balance = 1
@@ -118,9 +112,7 @@ class GoogleLoginView(APIView):
                 profile.free_transform_used = False
                 profile.save()
                 logger.info(f"Granted 1 initial credit to new user {email}")
-            # --- REMOVED: No longer give 100 credits on every login ---
-            # profile.credit_balance = 100 # REMOVED THIS LINE
-            # profile.save()             # REMOVED THIS LINE
+                cache.delete(f'user_profile_{user.id}')
 
             # Invalidate cache for this user upon login/signup to ensure fresh data
             cache.delete(f'user_profile_{user.id}')

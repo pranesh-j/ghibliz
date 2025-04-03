@@ -1,12 +1,22 @@
-import { Leaf } from "lucide-react"
-
+// src/components/ghibli-logo.tsx
+// src/components/ghibli-logo.tsx
 export function GhibliLogo() {
   return (
     <div className="flex items-center gap-2">
-      <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-        <Leaf className="w-5 h-5 text-green-600" />
+      <div className="flex items-center">
+        {/* Thinner colored frame/background */}
+        <div className="bg-amber-100 rounded-full p-0.5 flex items-center justify-center overflow-hidden border border-amber-200">
+          {/* Tree landscape logo */}
+          <div className="w-8 h-8 rounded-full overflow-hidden">
+            <img 
+              src="/ghiblit-logo.jpg" 
+              alt="Ghiblit" 
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </div>
+        <span className="text-2xl font-playfair font-semibold text-[#3D2911] ml-2">Ghiblit</span>
       </div>
-      <span className="text-2xl font-playfair font-semibold text-gray-800">Ghibliz</span>
     </div>
   )
 }

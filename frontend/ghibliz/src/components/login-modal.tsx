@@ -26,7 +26,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
       
       toast({
         title: "Login successful",
-        description: "Welcome to Ghibliz!",
+        description: "Welcome to Ghiblit!",
         variant: "success"
       })
       
@@ -58,7 +58,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-amber-50 border-none rounded-xl shadow-lg p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Welcome to Ghibliz</DialogTitle>
+          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Welcome to Ghiblit</DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
@@ -70,7 +70,7 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
 
           <div className="mb-8 text-center">
             <p className="text-ghibli-dark mb-2">
-              Sign in with your Google account to get unlimited access to Ghibliz.
+              Sign in with your Google account to get unlimited access to Ghiblit.
             </p>
             <p className="text-xs text-ghibli-dark/70">
               Google users get unlimited image transformations during our testing period!

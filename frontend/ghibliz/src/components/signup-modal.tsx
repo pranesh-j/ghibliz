@@ -26,7 +26,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
       
       toast({
         title: "Account created",
-        description: "Welcome to Ghibliz!",
+        description: "Welcome to Ghiblit.art!",
         variant: "success"
       })
       
@@ -58,7 +58,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] bg-amber-50 border-none rounded-xl shadow-lg p-6">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Join Ghibliz</DialogTitle>
+          <DialogTitle className="text-2xl font-playfair text-ghibli-dark text-center">Join Ghiblit</DialogTitle>
         </DialogHeader>
 
         <div className="py-4">
@@ -70,7 +70,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
 
           <div className="mb-4 text-center">
             <p className="text-ghibli-dark mb-6">
-              Create your account with Google to get unlimited testing access to Ghibliz.
+              Create your account with Google to get unlimited testing access to Ghiblit.art.
             </p>
           </div>
 

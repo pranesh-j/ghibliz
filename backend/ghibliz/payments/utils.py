@@ -4,7 +4,7 @@ import re
 def generate_upi_link(upi_id, amount, reference_code):
     """Generate UPI link with reference code in transaction note"""
     # Include reference code in transaction note
-    return f"upi://pay?pa={upi_id}&pn=Ghibliz&am={amount}&cu=INR&tn={reference_code}"
+    return f"upi://pay?pa={upi_id}&pn=Ghiblit&am={amount}&cu=INR&tn={reference_code}"
 
 def is_valid_transaction_id(transaction_id):
     """Basic validation for transaction ID formats"""

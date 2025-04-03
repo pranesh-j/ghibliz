@@ -99,7 +99,7 @@ if not os.environ.get('REDIS_URL'):
     CACHES = {
         'default': {
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-            'LOCATION': 'unique-ghibliz',
+            'LOCATION': 'unique-ghiblit',
         }
     }
 

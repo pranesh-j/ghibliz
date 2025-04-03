@@ -626,7 +626,7 @@ def create_payment_session(request):
     
     # UPI ID and other details
     upi_id = "pran.eth@axl"
-    merchant_name = "Ghibliz"
+    merchant_name = "Ghiblit"
     
     # Use the price from the database plan
     amount = plan.price_inr
@@ -708,7 +708,7 @@ def redirect_to_upi(request, session_id):
         
         # UPI ID and other details
         upi_id = "pran.eth@axl"
-        merchant_name = "Ghibliz"
+        merchant_name = "Ghiblit"
         amount = session.amount
         
         # Generate UPI URL with reference code in transaction note (tn) field
@@ -737,7 +737,7 @@ def get_payment_qr(request, session_id):
         
         # UPI details
         upi_id = "pran.eth@axl"
-        merchant_name = "Ghibliz"
+        merchant_name = "Ghiblit"
         amount = session.amount
         
         # Create UPI link with reference code in transaction reference field

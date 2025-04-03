@@ -283,7 +283,7 @@ export default function Home() {
     const shareUrl = imageData.preview_url || window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Ghiblified Image!', text: 'Check out this image I transformed using Ghibliz!', url: shareUrl });
+        await navigator.share({ title: 'Ghiblified Image!', text: 'Check out this image I transformed using Ghiblit.art!', url: shareUrl });
         toast({ title: "Shared!", description: "Image shared successfully.", variant: "success" });
       } else {
         navigator.clipboard.writeText(shareUrl);
@@ -346,16 +346,15 @@ export default function Home() {
                   </span>
                   {user.profile && (
                     <div className="flex items-center gap-1 mt-0.5">
-                      <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full"> {/* Reverted ml-2 */}
+                      <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
                         {user.profile.credit_balance} credit{user.profile.credit_balance !== 1 ? 's' : ''}
                       </span>
-                      {/* Reverted Buy Credits button styling */}
                       <Button
-                        className="p-1 h-auto bg-transparent hover:bg-transparent text-amber-600"
+                        className="ml-1 text-xs px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-center transition-colors"
                         onClick={handleBuyCredits}
-                         aria-label="Buy Credits"
+                        aria-label="Buy Credits"
                       >
-                        <CreditCard className="h-3 w-3 sm:h-4 sm:w-4" />
+                        Buy Credits
                       </Button>
                     </div>
                   )}

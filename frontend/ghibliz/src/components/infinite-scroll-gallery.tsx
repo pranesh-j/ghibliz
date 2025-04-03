@@ -1,5 +1,3 @@
-// frontend/ghibliz/src/components/infinite-scroll-gallery.tsx
-
 import React, { useEffect, useState, memo } from 'react';
 import { imageService } from '@/services/imageService';
 
