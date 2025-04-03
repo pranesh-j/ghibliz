@@ -111,6 +111,7 @@ class GoogleLoginView(APIView):
             profile_created = created # Store if the profile was just made
 
             # --- CHANGE: Grant 1 credit ONLY if the profile was newly created ---
+
             if profile_created:
                 profile.credit_balance = 1
                 # Ensure free_transform_used is False initially if you keep the field
