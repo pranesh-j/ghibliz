@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.conf import settings
 from django.http import HttpResponse
 from django.views.decorators.cache import cache_page
-
+from django.core.cache import cache
 
 class CreatePaymentView(views.APIView):
     permission_classes = [IsAuthenticated]
@@ -152,7 +152,7 @@ def verify_payment(request, session_id):
             screenshot, 
             reference_code, 
             session.amount,
-            session.created_at  # Pass session creation time
+            session.created_at
         )
         
         if not extracted_data['success']:
@@ -168,36 +168,41 @@ def verify_payment(request, session_id):
               f"recipient={payment_details.get('recipient_verified')}, "
               f"success={payment_details.get('payment_successful')}")
         
-        # 1. Verify reference code matches
-        if not payment_details.get('reference_code_matches', False):
-            return Response({
-                "error": "Reference code in the payment doesn't match. Please ensure you entered the exact reference code."
-            }, status=400)
-            
-        # 2. Verify amount matches
+        # NEW VERIFICATION APPROACH USING SCORING SYSTEM
+        verification_score = 0
+        required_score = 3  # Need at least 3 validations to pass
+
+        # Required checks (must pass)
         if not payment_details.get('amount_matches', False):
-            return Response({
-                "error": "Payment amount doesn't match the required amount. Please ensure you paid the exact amount."
-            }, status=400)
+            return Response({"error": "Payment amount doesn't match the required amount. Please ensure you paid the exact amount."}, status=400)
             
-        # 3. Verify payment was successful
         if not payment_details.get('payment_successful', False):
-            return Response({
-                "error": "The payment appears to have failed or is pending. Please provide a screenshot of a successful payment."
-            }, status=400)
-        
-        # 4. Verify timestamp is valid
-        if not payment_details.get('timestamp_valid', False):
-            return Response({
-                "error": "The payment timestamp is invalid. The payment must be made after creating the session and not in the future."
-            }, status=400)
+            return Response({"error": "The payment appears to have failed or is pending. Please provide a screenshot of a successful payment."}, status=400)
+
+        # Flexible checks (add to score)
+        if payment_details.get('reference_code_matches', False):
+            verification_score += 1
+            print("Reference code matches: +1 point")
+
+        if payment_details.get('timestamp_valid', False):
+            verification_score += 1
+            print("Timestamp valid: +1 point")
+
+        if payment_details.get('transaction_id', ''):
+            verification_score += 1  # Having a transaction ID increases confidence
+            print(f"Transaction ID present ({payment_details.get('transaction_id')}): +1 point")
             
-        # 5. Verify recipient is correct
-        if not payment_details.get('recipient_verified', False):
+        if payment_details.get('recipient_verified', False):
+            verification_score += 1
+            print("Recipient verified: +1 point")
+            
+        # Check if we have enough verifications
+        print(f"Final verification score: {verification_score}/{required_score} required")
+        if verification_score < required_score:
             return Response({
-                "error": "Payment recipient doesn't match expected recipient (pran.eth@axl or Pranesh Jahagirdar). Please ensure you're sending to the correct account."
+                "error": "Payment verification failed. Make sure your screenshot shows the complete payment confirmation."
             }, status=400)
-        
+
         # Create payment record
         payment = Payment.objects.create(
             user=request.user,
@@ -236,10 +241,6 @@ def verify_payment(request, session_id):
         return Response({
             "error": "We encountered a problem processing your payment verification. Please try again or contact support."
         }, status=500)
-
-
-
-
 
 def extract_payment_info_from_screenshot(screenshot, expected_reference_code, expected_amount, session_created_at=None):
     """
@@ -463,6 +464,10 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
         # Check if comparison object exists and has recipient match
         if 'comparison' in extracted_data and 'recipient_match' in extracted_data['comparison']:
             direct_recipient_match = direct_recipient_match or extracted_data['comparison']['recipient_match']
+            
+        # Check if comparison object exists and has recipient_name_match
+        if 'comparison' in extracted_data and 'recipient_name_match' in extracted_data['comparison']:
+            direct_recipient_match = direct_recipient_match or extracted_data['comparison']['recipient_name_match']
 
         # Final recipient verification result
         final_recipient_verified = recipient_verified or direct_recipient_match
@@ -478,55 +483,77 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             extracted_data.get('is_payment_successful', False)
         )
         
-        # Parse and validate timestamp
-        timestamp_str = extracted_data.get('payment_timestamp') or extracted_data.get('Payment timestamp') or ''
-        timestamp_valid = False
-        
-        if timestamp_str and session_created_at:
+        # NEW IMPROVED TIMESTAMP PARSING FUNCTION
+        def parse_payment_timestamp(timestamp_str, session_created_at):
             try:
-                # Try different date formats
+                # Remove ordinal indicators (1st, 2nd, 3rd, etc.)
                 import re
                 from datetime import datetime
+                from django.utils import timezone
+                import pytz
                 
-                # Clean the timestamp string (remove ordinal indicators like st, nd, rd, th)
-                cleaned_timestamp = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', timestamp_str)
+                cleaned = re.sub(r'(\d+)(st|nd|rd|th)', r'\1', timestamp_str)
                 
-                # Try different date formats commonly used in payment receipts
-                for date_format in [
-                    "%d %b %Y, %I:%M %p",      # 1 Apr 2025, 2:38 AM
-                    "%d %b %Y at %I:%M %p",    # 1 Apr 2025 at 2:38 AM
-                    "%d %b, %Y %I:%M %p",      # 1 Apr, 2025 2:38 AM
-                    "%d-%m-%Y %H:%M:%S",       # 01-04-2025 02:38:00
-                    "%d/%m/%Y %H:%M:%S",       # 01/04/2025 02:38:00
-                    "%Y-%m-%d %H:%M:%S"        # 2025-04-01 02:38:00
-                ]:
-                    try:
-                        payment_time = datetime.strptime(cleaned_timestamp, date_format)
-                        
-                        # Convert to timezone-aware datetime
-                        if timezone.is_naive(payment_time):
-                            payment_time = timezone.make_aware(payment_time)
-                        
-                        # Get current time
-                        now = timezone.now()
-                        
-                        print(f"Payment time: {payment_time}")
-                        print(f"Session created at: {session_created_at}")
-                        print(f"Current time: {now}")
-                        
-                        # Valid if: payment timestamp is after session creation and before now + 5 minutes
-                        timestamp_valid = (payment_time >= session_created_at and 
-                                          payment_time <= now + timezone.timedelta(minutes=5))
-                        
-                        if timestamp_valid:
-                            break
-                    except ValueError:
-                        continue
+                # Extract components with regex for custom parsing
+                date_match = re.search(r'(\d+)\s+([A-Za-z]+)[,]?\s+(\d{4})', cleaned)
+                time_match = re.search(r'(\d{1,2}):(\d{2})(?:\s*([AP]M))?', cleaned)
                 
-                print(f"Timestamp valid: {timestamp_valid}")
+                if date_match and time_match:
+                    day, month, year = date_match.groups()
+                    hour, minute, ampm = time_match.groups()
+                    
+                    # Convert month name to number
+                    month_map = {'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+                                'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12}
+                    month_num = month_map.get(month.lower()[:3], 1)
+                    
+                    # Handle AM/PM
+                    hour = int(hour)
+                    if ampm and ampm.upper() == 'PM' and hour < 12:
+                        hour += 12
+                    if ampm and ampm.upper() == 'AM' and hour == 12:
+                        hour = 0
+                        
+                    # Create a naive datetime
+                    payment_time_naive = datetime(int(year), month_num, int(day), hour, int(minute))
+                    
+                    # Assume payment time is in IST (UTC+5:30)
+                    ist = pytz.timezone('Asia/Kolkata')
+                    payment_time_ist = ist.localize(payment_time_naive)
+                    
+                    # Convert to UTC for comparison with Django datetimes
+                    payment_time = payment_time_ist.astimezone(pytz.UTC)
+                    
+                    print(f"Original timestamp: {timestamp_str}")
+                    print(f"Parsed time IST: {payment_time_ist}")
+                    print(f"Converted to UTC: {payment_time}")
+                    print(f"Session created at (UTC): {session_created_at}")
+                    
+                    # Compare times - allow a 24-hour window for safety
+                    time_window_start = session_created_at - timezone.timedelta(hours=12)
+                    time_window_end = timezone.now() + timezone.timedelta(hours=12)
+                    
+                    time_valid = (payment_time >= time_window_start and 
+                                payment_time <= time_window_end)
+                    
+                    print(f"Time window: {time_window_start} to {time_window_end}")
+                    print(f"Time valid: {time_valid}")
+                    
+                    return time_valid
+                
+                return False
             except Exception as e:
-                print(f"Error parsing timestamp: {str(e)}")
-                timestamp_valid = False
+                print(f"Timestamp parsing error: {str(e)}")
+                return False
+        # Parse and validate timestamp
+        timestamp_str = extracted_data.get('payment_timestamp') or extracted_data.get('Payment timestamp') or ''
+        timestamp_valid = parse_payment_timestamp(timestamp_str, session_created_at) if timestamp_str and session_created_at else False
+        
+        # Also check comparison object for timestamp validity
+        if 'comparison' in extracted_data and 'timestamp_valid' in extracted_data['comparison']:
+            timestamp_valid = timestamp_valid or extracted_data['comparison']['timestamp_valid']
+            
+        print(f"Timestamp valid: {timestamp_valid}")
         
         # Prepare verification results
         verification_result = {
@@ -542,7 +569,8 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
                 'amount_matches': final_amount_match,
                 'timestamp_valid': timestamp_valid,
                 'recipient_verified': final_recipient_verified,
-                'payment_successful': payment_successful
+                'payment_successful': payment_successful,
+                'comparison': extracted_data.get('comparison', {})
             }
         }
         
@@ -560,7 +588,6 @@ def extract_payment_info_from_screenshot(screenshot, expected_reference_code, ex
             'success': False,
             'error': 'We encountered a problem analyzing your payment screenshot. Please try again or contact support.'
         }
-
 
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
@@ -588,10 +615,14 @@ def create_payment_session(request):
             status=status.HTTP_404_NOT_FOUND
         )
     
+    # UPDATED: Generate reference code excluding confusing characters (O, 0, I, 1)
+    # Define character set without ambiguous characters
+    char_set = ''.join([c for c in string.ascii_uppercase + string.digits if c not in 'O0I1'])
+    
     # Generate unique reference code (8 characters)
-    reference_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    reference_code = ''.join(random.choices(char_set, k=8))
     while PaymentSession.objects.filter(reference_code=reference_code).exists():
-        reference_code = ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+        reference_code = ''.join(random.choices(char_set, k=8))
     
     # UPI ID and other details
     upi_id = "pran.eth@axl"
@@ -659,6 +690,7 @@ def create_payment_session(request):
             {"error": "Failed to generate payment QR code"}, 
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
 
 @api_view(['GET'])
 def redirect_to_upi(request, session_id):
