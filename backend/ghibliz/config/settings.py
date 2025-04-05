@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from datetime import timedelta
 import dj_database_url
-
+from decouple import config
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
+    'storages',
     
     # Project apps
     'api',
@@ -80,6 +81,36 @@ DATABASES = {
         conn_max_age=600 
     )
 }
+
+
+STORAGES = {
+    "default": {
+        "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    },
+}
+
+# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+
+AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')  # Supabase anon key
+AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')  # Supabase service_role key
+AWS_STORAGE_BUCKET_NAME = config('SUPABASE_STORAGE_BUCKET', default='generated-images')
+
+AWS_S3_ENDPOINT_URL = f"https://{config('SUPABASE_PROJECT_ID')}.supabase.co/storage/v1/s3"
+
+AWS_S3_CUSTOM_DOMAIN = f"{config('SUPABASE_PROJECT_ID', default='')}.supabase.co/storage/v1/object/public"
+AWS_S3_OBJECT_PARAMETERS = {
+    'CacheControl': 'max-age=86400',
+}
+AWS_LOCATION = ''
+AWS_DEFAULT_ACL = 'public-read'
+AWS_QUERYSTRING_AUTH = False
+
+
+
+
 
 
 

@@ -61,3 +61,5 @@ urllib3==2.3.0
 yarl==1.18.3
 django-redis==5.4.0
 pytz==2023.3  
+django-storages[boto3]
+python-decouple

@@ -9,11 +9,11 @@ def get_image_path(instance, filename):
     """Generate a unique path for storing generated images"""
     ext = filename.split('.')[-1]
     filename = f"{uuid.uuid4()}.{ext}"
-    return os.path.join('generated_images', filename)
+    return os.path.join('images', filename)
 
 
 class GeneratedImage(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='generated_images')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='images')
     image = models.ImageField(upload_to=get_image_path)
     preview_image = models.ImageField(upload_to=get_image_path, null=True, blank=True)
     is_paid = models.BooleanField(default=False)
