@@ -43,3 +43,21 @@ class GeneratedImage(models.Model):
             return False
         from django.utils import timezone
         return timezone.now() <= self.token_expires_at
+
+    def get_image_url(self):
+        """
+        Force the correct public URL format for images
+        """
+        from decouple import config
+        
+        if not self.image:
+            return None
+            
+        # Get the project ID 
+        project_id = config('SUPABASE_PROJECT_ID')
+        
+        # Extract just the filename part
+        path = self.image.name
+        
+        # Return properly formatted URL
+        return f"https://{project_id}.supabase.co/storage/v1/object/public/ghiblits/{path}"

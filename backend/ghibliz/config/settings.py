@@ -92,26 +92,27 @@ STORAGES = {
     },
 }
 
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+DEFAULT_FILE_STORAGE = 'config.storage.GeneratedImagesStorage'
 
-AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')  # Supabase anon key
-AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')  # Supabase service_role key
-AWS_STORAGE_BUCKET_NAME = config('SUPABASE_STORAGE_BUCKET', default='generated-images')
+# Supabase S3 credentials
+AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')
+AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')
+AWS_STORAGE_BUCKET_NAME = 'ghiblits'
 
+# This is the crucial part - we're using S3 API for upload but not for download URLs
 AWS_S3_ENDPOINT_URL = f"https://{config('SUPABASE_PROJECT_ID')}.supabase.co/storage/v1/s3"
 
-AWS_S3_CUSTOM_DOMAIN = f"{config('SUPABASE_PROJECT_ID', default='')}.supabase.co/storage/v1/object/public"
+
+
+# These settings ensure proper file handling
+AWS_QUERYSTRING_AUTH = False  # Don't add auth parameters to URLs
+AWS_DEFAULT_ACL = 'public-read'  # Always make files public
+AWS_S3_FILE_OVERWRITE = False  # Don't overwrite files with the same name
+
+# Object parameters for caching, etc.
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
-AWS_LOCATION = ''
-AWS_DEFAULT_ACL = 'public-read'
-AWS_QUERYSTRING_AUTH = False
-
-
-
-
-
 
 
 # Cache configuration with Redis
