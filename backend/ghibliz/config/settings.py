@@ -98,6 +98,7 @@ DEFAULT_FILE_STORAGE = 'config.storage.GeneratedImagesStorage'
 AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')
 AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')
 AWS_STORAGE_BUCKET_NAME = 'ghiblits'
+SUPABASE_PAYMENTS_BUCKET_NAME = os.getenv('SUPABASE_PAYMENTS_BUCKET_NAME', 'payments') #
 
 # This is the crucial part - we're using S3 API for upload but not for download URLs
 AWS_S3_ENDPOINT_URL = f"https://{config('SUPABASE_PROJECT_ID')}.supabase.co/storage/v1/s3"

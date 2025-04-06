@@ -1,7 +1,7 @@
 # payments/models.py
 from django.db import models
 from django.contrib.auth.models import User
-
+from config.storage import PaymentScreenshotsStorage  # Import the custom storage
 
 class Payment(models.Model):
     PAYMENT_METHODS = (
@@ -27,8 +27,13 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     reference_code = models.CharField(max_length=12, blank=True, null=True)
 
-    # Add these fields to the Payment model
-    screenshot = models.ImageField(upload_to='payment_screenshots/', null=True, blank=True)
+    # Use the custom storage for screenshot field
+    screenshot = models.ImageField(
+        upload_to='payment_screenshots/', 
+        null=True, 
+        blank=True,
+        storage=PaymentScreenshotsStorage()  # This is the key change
+    )
     upi_id = models.CharField(max_length=255, null=True, blank=True)
     upi_reference = models.CharField(max_length=255, null=True, blank=True)
     is_blocked = models.BooleanField(default=False)  # To allow admin to block users
@@ -46,7 +51,7 @@ class Payment(models.Model):
         verbose_name_plural = 'Payments'
         ordering = ['-created_at']
 
-
+# Rest of your models remain unchanged
 class PricingPlan(models.Model):
     name = models.CharField(max_length=100)
     credits = models.IntegerField()
