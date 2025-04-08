@@ -495,7 +495,7 @@ export default function Home() {
           <div className="max-w-4xl mx-auto text-center">
             {!isFullView && (
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-playfair text-ghibli-dark mb-1 sm:mb-2 leading-tight">
-                Turn photos into Ghibli art
+                Turn photos into Art
               </h1>
             )}
 

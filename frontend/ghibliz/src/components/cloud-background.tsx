@@ -28,13 +28,18 @@ export function CloudBackground() {
       width: number
       height: number
       speed: number
+      // Add a centerOffset property to track position relative to center
+      centerOffset: number
 
-      constructor(x: number, y: number, width: number, height: number, speed: number) {
-        this.x = x
-        this.y = y
+      constructor(centerOffset: number, y: number, width: number, height: number, speed: number) {
+        this.centerOffset = centerOffset // Store offset from center
         this.width = width
         this.height = height
         this.speed = speed
+        this.y = y
+        
+        // Set initial x based on center offset and current viewport
+        this.x = (window.innerWidth / 2) + centerOffset
       }
 
       draw() {
@@ -58,29 +63,63 @@ export function CloudBackground() {
       update() {
         if (!canvas) return
 
+        // Move cloud based on speed
         this.x += this.speed
-
-        if (this.speed > 0 && this.x > canvas.width + this.width) {
-          this.x = -this.width
-        } else if (this.speed < 0 && this.x < -this.width) {
-          this.x = canvas.width + this.width
+        
+        // Update centerOffset based on current position
+        this.centerOffset = this.x - (window.innerWidth / 2)
+        
+        // Wrap clouds relative to viewport center
+        const viewportWidth = window.innerWidth
+        
+        // Left edge - If cloud moves completely off left edge
+        if (this.x + this.width < 0) {
+          // Place it just off the right edge
+          this.x = viewportWidth + 10
+          this.centerOffset = this.x - (viewportWidth / 2)
         }
+        
+        // Right edge - If cloud moves completely off right edge
+        if (this.x - this.width > viewportWidth) {
+          // Place it just off the left edge
+          this.x = -this.width - 10
+          this.centerOffset = this.x - (viewportWidth / 2)
+        }
+      }
+      
+      // When window resizes, reposition cloud relative to new center
+      reposition() {
+        const viewportWidth = window.innerWidth
+        this.x = (viewportWidth / 2) + this.centerOffset
       }
     }
 
-    // Create clouds
+    // Create clouds with positions defined relative to center
     const clouds: Cloud[] = []
-    const numClouds = 15
+    const numClouds = 15 // Original number
 
     for (let i = 0; i < numClouds; i++) {
+      // Keep original cloud sizes
       const width = Math.random() * 200 + 100
       const height = width * 0.6
-      const x = Math.random() * (canvas.width + width * 2) - width
+      
+      // Position clouds with offset from center
+      const viewportWidth = window.innerWidth
+      const centerOffset = (Math.random() * viewportWidth * 1.5) - (viewportWidth * 0.75)
       const y = Math.random() * canvas.height * 0.7
+      
       const speed = (Math.random() - 0.5) * 0.5
 
-      clouds.push(new Cloud(x, y, width, height, speed))
+      clouds.push(new Cloud(centerOffset, y, width, height, speed))
     }
+
+    // Handle window resize by repositioning all clouds
+    const handleResize = () => {
+      resizeCanvas()
+      clouds.forEach(cloud => cloud.reposition())
+    }
+    
+    window.addEventListener("resize", handleResize)
 
     // Animation loop
     const animate = () => {
@@ -108,6 +147,7 @@ export function CloudBackground() {
 
     return () => {
       window.removeEventListener("resize", resizeCanvas)
+      window.removeEventListener("resize", handleResize)
     }
   }, [])
 
@@ -118,11 +158,9 @@ export function CloudBackground() {
         position: 'fixed',
         top: 0,
         left: 0,
-        width: '100vw',
-        height: '100vh', 
-        maxWidth: '100%', 
-        display: 'block', 
-        zIndex: -1 
+        width: '100%',
+        height: '100%',
+        zIndex: -1 // Put it behind everything else
       }}
     />
   )
