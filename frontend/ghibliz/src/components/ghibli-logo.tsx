@@ -1,5 +1,3 @@
-// src/components/ghibli-logo.tsx
-// src/components/ghibli-logo.tsx
 export function GhibliLogo() {
   return (
     <div className="flex items-center gap-2">
@@ -9,7 +7,7 @@ export function GhibliLogo() {
           {/* Tree landscape logo */}
           <div className="w-8 h-8 rounded-full overflow-hidden">
             <img 
-              src="/ghiblit-logo.jpg" 
+              src="/ghiblit.png" 
               alt="Ghiblit" 
               className="w-full h-full object-cover"
             />

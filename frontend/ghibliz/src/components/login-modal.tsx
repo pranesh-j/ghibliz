@@ -72,9 +72,6 @@ export function LoginModal({ open, onOpenChange }: LoginModalProps) {
             <p className="text-ghibli-dark mb-2">
               Sign in with your Google account to get unlimited access to Ghiblit.
             </p>
-            <p className="text-xs text-ghibli-dark/70">
-              Google users get unlimited image transformations during our testing period!
-            </p>
           </div>
 
           <div className="flex justify-center mb-4">

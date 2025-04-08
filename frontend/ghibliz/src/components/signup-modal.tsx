@@ -70,7 +70,7 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
 
           <div className="mb-4 text-center">
             <p className="text-ghibli-dark mb-6">
-              Create your account with Google to get unlimited testing access to Ghiblit.art.
+            Sign up with your Google account to get unlimited access to Ghiblit.
             </p>
           </div>
 

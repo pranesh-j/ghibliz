@@ -33,7 +33,7 @@ export function LoadingScreen({ show }: LoadingScreenProps) {
             {/* Smaller logo - 16x16 pixels */}
             <div className="w-16 h-16 rounded-xl overflow-hidden mb-6 shadow-lg">
               <img 
-                src="/ghiblit-logo.jpg" 
+                src="/ghiblit.png" 
                 alt="Ghiblit" 
                 className="w-full h-full object-cover"
               />
