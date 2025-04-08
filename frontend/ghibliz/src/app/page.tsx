@@ -416,18 +416,41 @@ export default function Home() {
                 </div>
              ) : isAuthenticated && user ? (
               <div className="flex items-center gap-2">
-                <div className="text-sm text-ghibli-dark mr-2">
+                <div className="flex flex-col items-center text-sm text-ghibli-dark mr-2">
                   <span className="font-medium">
                     {user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user.email || user.username}
                   </span>
                   {user.profile && (
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
+                    <div className="flex items-center justify-center gap-1 mt-0.5">
+                      <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
                         {user.profile.credit_balance} credit{user.profile.credit_balance !== 1 ? 's' : ''}
                       </span>
                       <Button
-                        className="ml-1 text-xs px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-white rounded-full text-center transition-colors"
-                        onClick={handleBuyCredits}
+                        className="ml-1 text-xs px-2 py-0.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-full text-center transition-colors relative overflow-hidden"
+                        onClick={(e) => {
+                          // Add ripple effect
+                          const button = e.currentTarget;
+                          const circle = document.createElement('span');
+                          const diameter = Math.max(button.clientWidth, button.clientHeight);
+                          const radius = diameter / 2;
+                          
+                          circle.style.width = circle.style.height = `${diameter}px`;
+                          circle.style.left = `${e.clientX - button.getBoundingClientRect().left - radius}px`;
+                          circle.style.top = `${e.clientY - button.getBoundingClientRect().top - radius}px`;
+                          circle.classList.add('ripple-effect');
+                          
+                          const ripple = button.getElementsByClassName('ripple-effect')[0];
+                          if (ripple) {
+                            ripple.remove();
+                          }
+                          
+                          button.appendChild(circle);
+                          
+                          // Then proceed with the normal handler after a tiny delay
+                          setTimeout(() => {
+                            handleBuyCredits();
+                          }, 10);
+                        }}
                         aria-label="Buy Credits"
                       >
                         Buy Credits
@@ -435,7 +458,6 @@ export default function Home() {
                     </div>
                   )}
                 </div>
-                {/* Reverted Sign out button styling */}
                 <Button
                   className="bg-transparent text-ghibli-dark border border-ghibli-dark/70 hover:bg-ghibli-dark/5 transition-colors flex items-center text-sm sm:text-base px-2 sm:px-4 py-1 sm:py-2"
                   onClick={logout}

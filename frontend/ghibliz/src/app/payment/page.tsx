@@ -681,9 +681,6 @@ export default function PaymentPage() {
                           <p className="text-xs font-medium text-ghibli-dark mb-2">
                             Screenshot Guide:
                           </p>
-                          <p className="text-xs text-ghibli-dark/80 mb-2">
-                            Please capture the entire payment confirmation screen without hiding any important details such as transaction ID, payment note, and amount.
-                          </p>
                           <p className="text-xs text-ghibli-dark/80 mt-2 font-medium">
                             <span className="text-blue-700">Important: Do not crop your screenshots as verification will fail for any cropped out screenshots. We don't store your screenshots after verification.</span>
                           </p>
