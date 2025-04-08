@@ -7,7 +7,7 @@ export function Footer() {
               © 2025 Ghiblit Art. All rights reserved.
             </div>
             <div className="text-xs text-ghibli-dark/70 text-center sm:text-right">
-              Built by <a href="https://linkedin.com/in/your-profile" className="hover:text-ghibli-dark transition-colors underline" target="_blank" rel="noopener noreferrer">@Pran</a>
+              Built by <a href="https://www.linkedin.com/in/pranesh-jahagirdar/" className="hover:text-ghibli-dark transition-colors underline" target="_blank" rel="noopener noreferrer">@Pran</a>
             </div>
           </div>
         </div>
