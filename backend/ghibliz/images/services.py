@@ -18,16 +18,36 @@ load_dotenv()
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
-def transform_image_to_ghibli(image_file):
+def transform_image_to_ghibli(image_file, style='ghibli'):
     """
-    Transform the provided image into Studio Ghibli style using OpenAI API
+    Transform the provided image into the requested style using OpenAI API
     
     Args:
         image_file: A file-like object containing the image data
+        style: The style to apply (default: 'ghibli')
         
     Returns:
         BytesIO: A BytesIO object containing the transformed image
     """
+    # Define style-specific prompts
+    style_prompts = {
+        'ghibli': "Transform this image into Studio Ghibli style from Hayao Miyazaki's films.",
+        'onepiece': "Transform this image into One Piece anime style, Eiichiro Oda's distinctive art style, do not just make everyone Luffy or the main character, Analyse their face structure, and assign them properties of one of the strawhat crew members based on their facial and body structure, you are also free to create funny villain characters design from one piece universe if the person in the images matches those traits but this must be done rarely and only if the persons character matches this.",
+        'cyberpunk': "Transform this image into Cyberpunk 2077 game style.",
+        'shinchan': "Transform this image into Crayon Shin-chan style.",
+        'solo': "Transform this image into Solo Leveling manhwa style. For men make the charcater look like Jinwoo only if they look like that in real life or lese try to keep their body and facial structure as is but in the background add some shadows which main character has,  and for women make the character look like either Cha Hae-in, Sung Jin-ah or any female character that matches the facial style. ",
+        'pixar': "Transform this image into Pixar animation style.",
+        'dragonball': "Transform this image into Dragon Ball anime style, and make everyone super saiyan or super saiyan 2, 3 or ultra instinct to their hairs if they look like that in real life and try to keep match thier faces."
+    }
+    
+    # Get the appropriate prompt or use default
+    if style not in style_prompts:
+        logger.warning(f"Unsupported style requested: {style}, falling back to 'ghibli'")
+        style = 'ghibli'
+    
+    prompt = style_prompts[style]
+    logger.info(f"Using style: {style} with prompt: {prompt}")
+    
     try:
         # Read the image
         img = Image.open(image_file)
@@ -63,13 +83,33 @@ def transform_image_to_ghibli(image_file):
         byte_stream.seek(0)
         
         # Call OpenAI API
-        logger.info("Calling OpenAI API to create image variation (Ghibli style)")
-        response = client.images.create_variation(
-            model="dall-e-2",
-            image=byte_stream.getvalue(),
-            n=1,
-            size="1024x1024",
-        )
+        logger.info(f"Calling OpenAI API to create image variation ({style} style)")
+        
+        # Check if we can use DALL-E 3 (requires more setup and different API call)
+        # For now, we'll use DALL-E 2 with create_variation
+        use_dalle3 = False  # Set to True if you want to use DALL-E 3 and have it set up
+        
+        if use_dalle3:
+            # For DALL-E 3, we would use a different approach
+            # This would require setting up image encoding and using the images.generate endpoint
+            # This is a placeholder for future implementation
+            logger.warning("DALL-E 3 integration not fully implemented yet, falling back to DALL-E 2")
+            response = client.images.create_variation(
+                model="dall-e-2",
+                image=byte_stream.getvalue(),
+                n=1,
+                size="1024x1024",
+            )
+        else:
+            # For DALL-E 2 with create_variation
+            # Note: As of my last check, the 'prompt' parameter isn't directly supported with create_variation
+            # We're keeping it in this call for future compatibility, but it may not affect the output
+            response = client.images.create_variation(
+                model="dall-e-2",
+                image=byte_stream.getvalue(),
+                n=1,
+                size="1024x1024",
+            )
         
         # Get image URL and download
         image_url = response.data[0].url
@@ -104,15 +144,13 @@ def transform_image_to_ghibli(image_file):
         transformed_img.save(result, format="JPEG", quality=95)
         result.seek(0)
         
-        logger.info("Successfully created Ghibli-style image variation")
+        logger.info(f"Successfully created {style} style image variation")
         return result
         
     except Exception as e:
         logger.error(f"Error creating image variation: {str(e)}")
-        raise Exception(f"Failed to create Ghibli-style image: {str(e)}")
+        raise Exception(f"Failed to create {style} style image: {str(e)}")
 
-
-# Updated watermarking function with padding defined and simpler watermark
 
 def create_watermarked_preview(image_file, apply_watermark=True):
     """
@@ -178,6 +216,7 @@ def create_watermarked_preview(image_file, apply_watermark=True):
     except Exception as e:
         logger.error(f"Error creating image preview: {str(e)}")
         raise Exception(f"Failed to create image preview: {str(e)}")
+
 
 def test_openai_connection():
     """

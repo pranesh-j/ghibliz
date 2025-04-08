@@ -32,8 +32,11 @@ class ImageTransformAPIView(views.APIView):
             logger.warning(f"Image upload validation failed: {serializer.errors}")
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get the uploaded image
+        # Get the uploaded image and style
         image_file = serializer.validated_data['image']
+        style = request.data.get('style', 'ghibli')  # Default to 'ghibli' if not provided
+        
+        logger.info(f"Processing image with style: {style}")
 
         # Initialize user and user_profile variables
         user = request.user
@@ -72,8 +75,8 @@ class ImageTransformAPIView(views.APIView):
 
         try:
             logger.info(f"Starting image transformation for user {user.username}")
-            # Transform the image using OpenAI
-            transformed_image = transform_image_to_ghibli(image_file)
+            # Transform the image using OpenAI with specified style
+            transformed_image = transform_image_to_ghibli(image_file, style=style)
 
             # Create the preview image (no watermark needed as all transforms are paid/credited)
             preview_image = create_watermarked_preview(transformed_image, apply_watermark=False)
@@ -161,7 +164,6 @@ class ImageTransformAPIView(views.APIView):
                 {"error": "Failed to transform image. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
 
 @api_view(['GET'])
 @permission_classes([AllowAny])

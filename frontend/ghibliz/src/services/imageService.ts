@@ -24,9 +24,11 @@ interface ShareResponse {
 
 const ImageService = {
     // Transform image
-    transformImage: async (imageFile: File): Promise<ImageTransformResponse> => {
+// Update this function in src/services/imageService.ts
+    transformImage: async (imageFile: File, stylePreset: string = 'ghibli'): Promise<ImageTransformResponse> => {
         const formData = new FormData();
         formData.append('image', imageFile);
+        formData.append('style', stylePreset); // Add the style parameter
 
         try {
             // --- FIX: Removed leading /api/ ---
@@ -34,11 +36,10 @@ const ImageService = {
             return response.data;
         } catch (error: any) {
             console.error("Image transform API error:", error.response?.data || error.message);
-             // Re-throw the error to allow the calling component (page.tsx) to handle specific status codes (like 402)
-             throw error;
+            // Re-throw the error to allow the calling component (page.tsx) to handle specific status codes (like 402)
+            throw error;
         }
     },
-
     // Get recent images
     getRecentImages: async (limit: number = 6): Promise<RecentImage[]> => {
         try {
