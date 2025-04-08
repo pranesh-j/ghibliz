@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "buildCommand": "npm run build",
+    "installCommand": "npm install",
+    "framework": "nextjs",
+    "outputDirectory": ".next",
+    "env": {
+      "NEXT_PUBLIC_API_URL": "will be added later",
+      "NEXT_PUBLIC_GOOGLE_CLIENT_ID": ""
+    }
+  }

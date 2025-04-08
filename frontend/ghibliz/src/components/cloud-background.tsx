@@ -118,9 +118,11 @@ export function CloudBackground() {
         position: 'fixed',
         top: 0,
         left: 0,
-        width: '100%',
-        height: '100%',
-        zIndex: -1 // Put it behind everything else
+        width: '100vw',
+        height: '100vh', 
+        maxWidth: '100%', 
+        display: 'block', 
+        zIndex: -1 
       }}
     />
   )

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 
 export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string) => void }) {
   const [selectedStyle, setSelectedStyle] = useState('ghibli');
+  // Add state to track if default has been changed
+  const [defaultChanged, setDefaultChanged] = useState(false);
 
   const presets = [
     { id: 'onepiece', name: 'Onepiece' },
@@ -18,6 +20,11 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
   ];
 
   const handleStyleSelect = (styleId: string) => {
+    // If style changes at all (even to ghibli), mark default as changed
+    if (!defaultChanged) {
+      setDefaultChanged(true);
+    }
+    
     setSelectedStyle(styleId);
     if (onSelectStyle) {
       onSelectStyle(styleId);
@@ -81,17 +88,24 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
                 }}
               />
               
-              {style.isDefault && (
+              {/* Only show Default badge if it's the default style AND the user hasn't changed styles yet */}
+              {style.isDefault && !defaultChanged && (
                 <div className="absolute top-0 left-0 bg-amber-400 text-white text-xs px-1 rounded-br text-[8px]">
                   Default
                 </div>
               )}
-              {selectedStyle === style.id && !style.isDefault && (
-                <div className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-amber-400 rounded-bl">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-2.5 h-2.5">
-                    <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clipRule="evenodd" />
-                  </svg>
-                </div>
+              
+              {/* Show selection checkmark for the selected style */}
+              {selectedStyle === style.id && (
+                // Don't show checkmark alongside Default badge to avoid visual clutter
+                // But always show it if defaultChanged is true
+                (defaultChanged || !style.isDefault) && (
+                  <div className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-amber-400 rounded-bl">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-2.5 h-2.5">
+                      <path fillRule="evenodd" d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )
               )}
             </div>
             <span className="text-xs text-ghibli-dark mt-1">{style.name}</span>

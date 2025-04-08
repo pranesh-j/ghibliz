@@ -13,7 +13,7 @@ import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
 import ImageService, { RecentImage } from "@/services/imageService"
 import { useRouter } from "next/navigation"
-
+import { Footer } from "@/components/footer"
 
 export default function Home() {
   // Keep functional changes: Added refreshUserProfile
@@ -651,11 +651,6 @@ export default function Home() {
                 </>
               )}
             {/* Reverted View more button styling if needed */}
-            <div className="text-center mt-4 sm:mt-8">
-              <button className="bg-ghibli-dark text-amber-50 px-3 sm:px-5 py-1.5 sm:py-2 rounded-md flex text-sm items-center mx-auto hover:bg-ghibli-dark/90 transition-colors">
-                View more creations <ArrowRight className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" />
-              </button>
-            </div>
           </div>
         </section>
 
@@ -680,6 +675,9 @@ export default function Home() {
         {/* Modals */}
         <LoginModal open={loginOpen} onOpenChange={setLoginOpen} onSwitchToSignup={handleSwitchToSignup} />
         <SignupModal open={signupOpen} onOpenChange={setSignupOpen} onSwitchToLogin={handleSwitchToLogin} />
+        
+        {/* Add Footer component here */}
+        <Footer />
       </div>
     </main>
   )

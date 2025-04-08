@@ -249,8 +249,8 @@ export default function PaymentPage() {
     }
     reader.readAsDataURL(file)
   }
-  
-  // Handle verification submission
+
+
   const handleVerifyPayment = async () => {
     if (!currentSession || !screenshot) return
     
@@ -278,11 +278,35 @@ export default function PaymentPage() {
         variant: "success"
       })
     } catch (error: any) {
-      // existing error handling code
+      // Improved error handling with toast notifications
+      console.error("Verification error:", error);
+      
+      let errorMessage = "Verification failed. Please try again.";
+      let errorTitle = "Verification Failed";
+      
+      // Extract detailed error message if available
+      if (error.response?.data?.error) {
+        errorMessage = error.response.data.error;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      // Show toast with error details
+      toast({
+        title: errorTitle,
+        description: errorMessage,
+        variant: "error"
+      });
+      
+      // Reset screenshot if needed on verification failure
+      // Uncomment if you want to clear the screenshot on failure
+      // setScreenshot(null);
+      // setPreviewUrl(null);
     } finally {
       setSubmittingVerification(false)
     }
   }
+
   // Reset the payment process
   const handleReset = () => {
     setCurrentSession(null)

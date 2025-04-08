@@ -79,11 +79,53 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .animate-marquee {
-  animation: marquee 30s linear infinite;
+  animation: marquee 45s linear infinite;
+  min-width: 200%;
+}
+.animate-marquee-reverse {
+  animation: marquee-reverse 45s linear infinite;
   min-width: 200%;
 }
 
-.animate-marquee-reverse {
-  animation: marquee-reverse 30s linear infinite;
-  min-width: 200%;
+/* Add this to globals.css */
+
+/* Custom scrollbar styling */
+/* For Webkit browsers (Chrome, Safari, newer Edge) */
+::-webkit-scrollbar {
+  width: 8px; /* Thinner scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(176, 224, 230, 0.3); /* Light blue from your theme - transparent */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.5); /* Amber color from your theme - semi-transparent */
+  border-radius: 10px;
+  border: 2px solid rgba(176, 224, 230, 0.1); /* Light border */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.7); /* Darker on hover */
+}
+
+/* For Firefox */
+html {
+  scrollbar-width: thin; /* "thin", "auto", or "none" */
+  scrollbar-color: rgba(245, 158, 11, 0.5) rgba(176, 224, 230, 0.3); /* thumb and track color */
+}
+
+/* Make sure the main container allows scrolling but hides horizontal overflow */
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Keep canvas from causing overflow */
+canvas {
+  display: block;
 }
