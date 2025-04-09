@@ -16,6 +16,7 @@ interface PaymentTimerProps {
   onExpire: () => void;
 }
 
+
 const PaymentTimer = ({ expiresAt, onExpire }: PaymentTimerProps) => {
   const [countdown, setCountdown] = useState<number | null>(null);
   const router = useRouter();
@@ -49,7 +50,7 @@ const PaymentTimer = ({ expiresAt, onExpire }: PaymentTimerProps) => {
     return () => clearInterval(timer);
   }, [expiresAt, onExpire, router]);
   
-  const formatTime = (seconds) => {
+  const formatTime = (seconds: number | null) => {
     if (seconds === null) return '--:--';
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -75,7 +76,13 @@ const PaymentTimer = ({ expiresAt, onExpire }: PaymentTimerProps) => {
   );
 };
 
-const ReferenceCodeHighlighter = ({ referenceCode }) => {
+
+// Also need to add type for ReferenceCodeHighlighter 
+interface ReferenceCodeHighlighterProps {
+  referenceCode: string;
+}
+
+const ReferenceCodeHighlighter = ({ referenceCode }: ReferenceCodeHighlighterProps) => {
   const [copied, setCopied] = useState(false);
   
   const handleCopy = () => {
