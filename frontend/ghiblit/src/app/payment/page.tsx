@@ -11,10 +11,15 @@ import { useToast } from "@/components/ui/toast"
 import api from "@/services/api"
 
 
-const PaymentTimer = ({ expiresAt, onExpire }) => {
-  const [countdown, setCountdown] = useState(null);
-  const router = useRouter();
+interface PaymentTimerProps {
+  expiresAt: string;
+  onExpire: () => void;
+}
 
+const PaymentTimer = ({ expiresAt, onExpire }: PaymentTimerProps) => {
+  const [countdown, setCountdown] = useState<number | null>(null);
+  const router = useRouter();
+  
   useEffect(() => {
     if (!expiresAt) return;
     
