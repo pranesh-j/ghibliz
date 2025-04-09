@@ -1,4 +1,3 @@
-# payments/management/commands/create_default_pricing.py
 from django.core.management.base import BaseCommand
 from payments.models import PricingPlan
 

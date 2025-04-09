@@ -1,4 +1,3 @@
-// src/services/imageService.ts
 import api from './api';
 
 export interface RecentImage {

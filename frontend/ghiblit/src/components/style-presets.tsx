@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 
 export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string) => void }) {
   const [selectedStyle, setSelectedStyle] = useState('ghibli');
-  // Add state to track if default has been changed
   const [defaultChanged, setDefaultChanged] = useState(false);
 
   const presets = [
@@ -16,11 +15,9 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
     { id: 'manga', name: 'Manga' },
     { id: 'minecraft', name: 'Minecraft' },
     
-    // Add more presets as needed
   ];
 
   const handleStyleSelect = (styleId: string) => {
-    // If style changes at all (even to ghibli), mark default as changed
     if (!defaultChanged) {
       setDefaultChanged(true);
     }
@@ -31,12 +28,8 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
     }
   };
 
-  // Updated grid column settings for exactly 9 items in a row on desktop
   const getGridColsClass = () => {
-    // For mobile: 3 per row
-    // For small screens: 5 per row
-    // For medium screens: 6 per row
-    // For large screens: 9 per row
+
     return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9";
   };
 
@@ -55,7 +48,6 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
             onClick={() => handleStyleSelect(style.id)}
           >
             <div className="relative w-12 h-12 rounded-md overflow-hidden border border-gray-200 bg-gray-50">
-              {/* Use PNG images */}
               <img 
                 src={`/style-icons/${style.id}.png`} 
                 alt={style.name}
@@ -65,13 +57,11 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
                   const target = e.currentTarget as HTMLImageElement;
                   target.style.display = 'none';
                   
-                  // Create a colored div as placeholder
                   const parent = target.parentElement;
                   if (parent) {
                     const placeholder = document.createElement('div');
                     placeholder.className = 'w-full h-full';
                     
-                    // Set different background colors based on style
                     if (style.id === 'ghibli') placeholder.className += ' bg-green-100';
                     else if (style.id === 'onepiece') placeholder.className += ' bg-blue-100';
                     else if (style.id === 'cyberpunk') placeholder.className += ' bg-purple-100';
@@ -88,17 +78,15 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
                 }}
               />
               
-              {/* Only show Default badge if it's the default style AND the user hasn't changed styles yet */}
+            
               {style.isDefault && !defaultChanged && (
                 <div className="absolute top-0 left-0 bg-amber-400 text-white text-xs px-1 rounded-br text-[8px]">
                   Default
                 </div>
               )}
               
-              {/* Show selection checkmark for the selected style */}
               {selectedStyle === style.id && (
-                // Don't show checkmark alongside Default badge to avoid visual clutter
-                // But always show it if defaultChanged is true
+
                 (defaultChanged || !style.isDefault) && (
                   <div className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-amber-400 rounded-bl">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-2.5 h-2.5">

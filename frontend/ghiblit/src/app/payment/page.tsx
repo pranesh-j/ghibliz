@@ -11,7 +11,6 @@ import { useToast } from "@/components/ui/toast"
 import api from "@/services/api"
 
 
-// Payment Timer Component
 const PaymentTimer = ({ expiresAt, onExpire }) => {
   const [countdown, setCountdown] = useState(null);
   const router = useRouter();
@@ -25,10 +24,8 @@ const PaymentTimer = ({ expiresAt, onExpire }) => {
       return Math.max(0, Math.floor((expiryTime - now) / 1000));
     };
     
-    // Set initial countdown
     setCountdown(calculateTimeLeft());
     
-    // Update countdown every second
     const timer = setInterval(() => {
       const timeLeft = calculateTimeLeft();
       setCountdown(timeLeft);
@@ -36,11 +33,9 @@ const PaymentTimer = ({ expiresAt, onExpire }) => {
       if (timeLeft <= 0) {
         clearInterval(timer);
         
-        // Handle expiration
         if (onExpire && typeof onExpire === 'function') {
           onExpire();
         } else {
-          // If no callback provided, reload the page
           router.refresh();
         }
       }
@@ -49,7 +44,6 @@ const PaymentTimer = ({ expiresAt, onExpire }) => {
     return () => clearInterval(timer);
   }, [expiresAt, onExpire, router]);
   
-  // Format time as MM:SS
   const formatTime = (seconds) => {
     if (seconds === null) return '--:--';
     const mins = Math.floor(seconds / 60);
@@ -76,7 +70,6 @@ const PaymentTimer = ({ expiresAt, onExpire }) => {
   );
 };
 
-// Reference Code Highlighter Component
 const ReferenceCodeHighlighter = ({ referenceCode }) => {
   const [copied, setCopied] = useState(false);
   
@@ -117,7 +110,6 @@ const ReferenceCodeHighlighter = ({ referenceCode }) => {
   );
 };
 
-// Updated interfaces
 interface PricingPlan {
   id: number;
   name: string;
@@ -131,9 +123,9 @@ interface PaymentSession {
   amount: number;
   plan_name: string;
   expires_at: string;
-  upi_link: string;              // Direct UPI link from backend
-  qr_code_data: string;          // Base64 encoded QR code image
-  reference_code?: string;       // Reference code (may be included from backend)
+  upi_link: string;              
+  qr_code_data: string;          
+  reference_code?: string;       
 }
 
 export default function PaymentPage() {
@@ -163,7 +155,7 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(false)
   const [creatingPayment, setCreatingPayment] = useState(false)
   
-  // Payment state
+
   const [currentSession, setCurrentSession] = useState<PaymentSession | null>(null)
   const [paymentMode, setPaymentMode] = useState<'link' | 'qr'>('link')
   const [screenshot, setScreenshot] = useState<File | null>(null)
@@ -171,7 +163,7 @@ export default function PaymentPage() {
   const [submittingVerification, setSubmittingVerification] = useState(false)
   const [verificationComplete, setVerificationComplete] = useState(false)
   
-  // Handle session expiration
+
   const handleSessionExpired = () => {
     toast({
       title: "Session expired",
@@ -179,20 +171,19 @@ export default function PaymentPage() {
       variant: "error"
     });
     
-    // Reset the payment state
+
     setCurrentSession(null);
     setVerificationComplete(false);
     setScreenshot(null);
     setPreviewUrl(null);
   };
   
-  // Create payment session
+
   const handleCreatePayment = async () => {
     if (!selectedPlan) return
     
     setCreatingPayment(true)
     try {
-      // Real API call to create payment session
       const response = await api.post('/payments/sessions/create/', {
         plan_id: selectedPlan.id
       });
@@ -216,12 +207,10 @@ export default function PaymentPage() {
     }
   }
   
-  // Handle screenshot upload
   const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
     
-    // Check file type and size
     if (!file.type.startsWith('image/')) {
       toast({
         title: "Invalid file",
@@ -231,7 +220,7 @@ export default function PaymentPage() {
       return
     }
     
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+    if (file.size > 5 * 1024 * 1024) { 
       toast({
         title: "File too large",
         description: "Screenshot must be less than 5MB",
@@ -242,7 +231,7 @@ export default function PaymentPage() {
     
     setScreenshot(file)
     
-    // Create preview URL
+
     const reader = new FileReader()
     reader.onloadend = () => {
       setPreviewUrl(reader.result as string)
@@ -256,11 +245,9 @@ export default function PaymentPage() {
     
     setSubmittingVerification(true)
     try {
-      // Create form data for file upload
       const formData = new FormData();
       formData.append('screenshot', screenshot);
       
-      // Send to backend for verification
       const response = await api.post(`/payments/sessions/${currentSession.session_id}/verify/`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -269,7 +256,6 @@ export default function PaymentPage() {
       
       setVerificationComplete(true)
       
-      // Add this line to refresh the user profile after verification
       await refreshUserProfile();
       
       toast({
@@ -278,36 +264,28 @@ export default function PaymentPage() {
         variant: "success"
       })
     } catch (error: any) {
-      // Improved error handling with toast notifications
       console.error("Verification error:", error);
       
       let errorMessage = "Verification failed. Please try again.";
       let errorTitle = "Verification Failed";
       
-      // Extract detailed error message if available
       if (error.response?.data?.error) {
         errorMessage = error.response.data.error;
       } else if (error.message) {
         errorMessage = error.message;
       }
       
-      // Show toast with error details
       toast({
         title: errorTitle,
         description: errorMessage,
         variant: "error"
       });
       
-      // Reset screenshot if needed on verification failure
-      // Uncomment if you want to clear the screenshot on failure
-      // setScreenshot(null);
-      // setPreviewUrl(null);
     } finally {
       setSubmittingVerification(false)
     }
   }
 
-  // Reset the payment process
   const handleReset = () => {
     setCurrentSession(null)
     setVerificationComplete(false)
@@ -315,7 +293,6 @@ export default function PaymentPage() {
     setPreviewUrl(null)
   }
   
-  // Go back to home page
   const handleGoHome = () => {
     router.push('/')
   }
@@ -333,15 +310,11 @@ export default function PaymentPage() {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden">
-      {/* Cloud Background */}
       <CloudBackground />
 
-      {/* Content Container */}
       <div className="relative z-10 min-h-screen">
-        {/* Header */}
         <header className="pt-3 sm:pt-4 px-3 md:px-8">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
-            {/* Logo */}
             <GhibliLogo />
 
             {isAuthenticated && user && (
@@ -359,9 +332,7 @@ export default function PaymentPage() {
           </div>
         </header>
 
-        {/* Main Content */}
         <div className="container mx-auto px-4 py-8">
-          {/* Back Button */}
           <button
             onClick={handleGoHome}
             className="flex items-center text-sm text-ghibli-dark mb-6 hover:text-ghibli-dark/80 transition-colors"
@@ -370,7 +341,6 @@ export default function PaymentPage() {
             Back to Home
           </button>
 
-          {/* Page Title */}
           <h1 className="text-3xl md:text-4xl font-playfair text-ghibli-dark mb-6 text-center">
             Buy Credits
           </h1>
@@ -381,10 +351,8 @@ export default function PaymentPage() {
             </div>
           ) : (
             <>
-              {/* Payment Flow Container */}
               <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
                 {!currentSession ? (
-                  /* Step 1: Plan Selection */
                   <div>
                     <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
                       Choose a Package
@@ -438,13 +406,11 @@ export default function PaymentPage() {
                     </Button>
                   </div>
                 ) : !verificationComplete ? (
-                  /* Step 2: Payment and Verification */
                   <div>
                     <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
                       Complete Your Payment
                     </h2>
                     
-                    {/* Payment Details Summary */}
                     <div className="bg-amber-50 p-4 rounded-lg mb-6">
                       <div className="flex justify-between mb-2">
                         <span className="text-sm text-ghibli-dark/80">Package:</span>
@@ -466,7 +432,6 @@ export default function PaymentPage() {
                       </div>
                     </div>
                     
-                    {/* Payment Timer - UPDATED */}
                     {currentSession && (
                       <PaymentTimer 
                         expiresAt={currentSession.expires_at}
@@ -474,12 +439,10 @@ export default function PaymentPage() {
                       />
                     )}
                     
-                    {/* Reference Code Highlighter - NEW */}
                     {currentSession && currentSession.reference_code && (
                       <ReferenceCodeHighlighter referenceCode={currentSession.reference_code} />
                     )}
                     
-                    {/* Payment Method Toggle */}
                     <div className="flex border rounded-lg overflow-hidden mb-6">
                       <button
                         className={`flex-1 py-2 flex justify-center items-center ${
@@ -505,7 +468,6 @@ export default function PaymentPage() {
                       </button>
                     </div>
                     
-                    {/* UPI Link */}
                     {paymentMode === 'link' && (
                       <div className="mb-6">
                         <p className="text-sm text-center text-ghibli-dark mb-4">
@@ -568,7 +530,6 @@ export default function PaymentPage() {
                       <div className="mb-6">
                         <div className="flex justify-center mb-4">
                           <div className="bg-white p-3 rounded-lg border">
-                            {/* Use the base64 QR code image directly */}
                             <img
                               src={currentSession.qr_code_data}
                               alt="UPI QR Code"
@@ -619,7 +580,6 @@ export default function PaymentPage() {
                         Verify Your Payment
                       </h3>
                       
-                      {/* Warning message */}
                       <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md">
                         <p className="text-sm text-red-700 font-medium">Important Notice:</p>
                         <p className="text-xs text-red-600 mt-1">

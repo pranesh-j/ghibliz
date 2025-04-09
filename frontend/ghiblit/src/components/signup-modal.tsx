@@ -21,7 +21,6 @@ export function SignupModal({ open, onOpenChange, onSwitchToLogin }: SignupModal
   const handleGoogleLoginSuccess = async (credentialResponse: any) => {
     try {
       setError(null)
-      // Send the ID token to your backend
       await googleLogin(credentialResponse.credential)
       
       toast({

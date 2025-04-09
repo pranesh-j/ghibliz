@@ -2,6 +2,7 @@ import boto3
 from botocore.client import Config
 from io import BytesIO
 from decouple import config
+import re
 
 class SupabaseClient:
     """Custom client for Supabase Storage that handles their specific response format"""
@@ -43,35 +44,26 @@ class SupabaseClient:
     
     def _clean_content(self, content):
         """Clean the content received from Supabase to remove any metadata headers"""
-        # Check if content starts with digits followed by \r\n (chunk size indicator)
-        import re
-        
-        # First, look for PNG header which always starts with the bytes 89 50 4E 47 0D 0A 1A 0A
         png_header = b'\x89PNG\r\n\x1a\n'
         png_pos = content.find(png_header)
         if png_pos > 0:
             return content[png_pos:]
         
-        # Look for JPEG header (FF D8 FF)
         jpeg_header = b'\xff\xd8\xff'
         jpeg_pos = content.find(jpeg_header)
         if jpeg_pos > 0:
             return content[jpeg_pos:]
         
-        # Check for content-size header pattern (digits followed by \r\n)
-        chunk_pattern = re.compile(b'^(\d+)\r\n')
+        chunk_pattern = re.compile(b'^([\d]+)\r\n')
         match = chunk_pattern.match(content)
         if match:
-            chunk_size_str = match.group(1)
             header_end = match.end()
             return content[header_end:]
             
-        # Look for double \r\n\r\n which typically separates HTTP headers from body
         headers_end = content.find(b'\r\n\r\n')
         if headers_end > 0:
             return content[headers_end+4:]
             
-        # If none of the above match, return the original content
         return content
     
     def get_public_url(self, bucket_name, object_key):

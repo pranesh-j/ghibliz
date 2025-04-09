@@ -1,4 +1,3 @@
-// src/components/loading-screen.tsx
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface LoadingScreenProps {
@@ -16,10 +15,9 @@ export function LoadingScreen({ show }: LoadingScreenProps) {
           transition={{ duration: 0.6, ease: "easeInOut" }}
           className="fixed inset-0 bg-[#B0E0E6]/80 backdrop-blur-sm flex flex-col items-center justify-center z-[9999]"
         >
-          {/* Using a static cloud effect for the loading screen */}
           <div className="absolute inset-0 z-0 overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-[#87CEEB] to-[#B0E0E6]">
-              {/* Static clouds for better performance */}
+
               <div className="absolute top-[10%] left-[5%] w-32 h-20 bg-white/80 rounded-full blur-md"></div>
               <div className="absolute top-[25%] left-[25%] w-40 h-24 bg-white/80 rounded-full blur-md"></div>
               <div className="absolute top-[15%] left-[60%] w-36 h-20 bg-white/80 rounded-full blur-md"></div>
@@ -30,7 +28,7 @@ export function LoadingScreen({ show }: LoadingScreenProps) {
           </div>
           
           <div className="relative z-10 flex flex-col items-center">
-            {/* Smaller logo - 16x16 pixels */}
+
             <div className="w-16 h-16 rounded-xl overflow-hidden mb-6 shadow-lg">
               <img 
                 src="/ghiblit.png" 
@@ -39,9 +37,7 @@ export function LoadingScreen({ show }: LoadingScreenProps) {
               />
             </div>
             
-            {/* Removed the Ghiblit text as requested */}
             
-            {/* Improved spinner animation */}
             <div className="flex items-center justify-center">
               <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
