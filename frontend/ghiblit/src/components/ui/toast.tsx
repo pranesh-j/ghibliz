@@ -12,7 +12,7 @@ interface Toast {
   description?: string
   variant: ToastVariant
   duration: number
-  action?: ReactNode // Add action prop
+  action?: ReactNode // Only addition needed
 }
 
 interface ToastOptions {
@@ -20,7 +20,7 @@ interface ToastOptions {
   description?: string
   variant?: ToastVariant
   duration?: number
-  action?: ReactNode // Add action prop
+  action?: ReactNode // Only addition needed
 }
 
 interface ToastContextValue {
@@ -88,7 +88,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 {toast.description && (
                   <p className="text-xs mt-1 opacity-90">{toast.description}</p>
                 )}
-                {/* Render action if provided */}
                 {toast.action && (
                   <div className="mt-2">
                     {toast.action}
