@@ -12,6 +12,7 @@ interface Toast {
   description?: string
   variant: ToastVariant
   duration: number
+  action?: ReactNode // Add action prop
 }
 
 interface ToastOptions {
@@ -19,6 +20,7 @@ interface ToastOptions {
   description?: string
   variant?: ToastVariant
   duration?: number
+  action?: ReactNode // Add action prop
 }
 
 interface ToastContextValue {
@@ -47,13 +49,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     title, 
     description, 
     variant = 'info', 
-    duration = 5000 
+    duration = 5000,
+    action
   }: ToastOptions): string => {
     const id = Math.random().toString(36).substring(2, 9);
     
     setToasts((prev) => [
       ...prev,
-      { id, title, description, variant, duration }
+      { id, title, description, variant, duration, action }
     ]);
 
     // Auto-remove toast after duration
@@ -84,6 +87,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 )}
                 {toast.description && (
                   <p className="text-xs mt-1 opacity-90">{toast.description}</p>
+                )}
+                {/* Render action if provided */}
+                {toast.action && (
+                  <div className="mt-2">
+                    {toast.action}
+                  </div>
                 )}
               </div>
               <button
