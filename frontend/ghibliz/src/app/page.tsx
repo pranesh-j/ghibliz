@@ -38,6 +38,14 @@ export default function Home() {
   // Image viewing state
   const [viewingImage, setViewingImage] = useState<"original" | "processed" | null>(null)
   const [isFullView, setIsFullView] = useState(false)
+  
+  // NEW: Add state for Buy Credits button
+  const [isRedirecting, setIsRedirecting] = useState(false)
+  
+  // NEW: Prefetch payment page
+  useEffect(() => {
+    router.prefetch('/payment');
+  }, [router]);
 
   // Keep functional change: Image sizing logic
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -395,7 +403,9 @@ export default function Home() {
     setSignupOpen(true)
   }
 
+  // MODIFIED: Updated handleBuyCredits function
   const handleBuyCredits = () => {
+    setIsRedirecting(true); // Show loading state immediately
     router.push('/payment');
     setShowPromoPopup(false);
   }
@@ -425,35 +435,21 @@ export default function Home() {
                       <span className="bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
                         {user.profile.credit_balance} credit{user.profile.credit_balance !== 1 ? 's' : ''}
                       </span>
+                      {/* MODIFIED: Updated Buy Credits button */}
                       <Button
                         className="ml-1 text-xs px-2 py-0.5 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white rounded-full text-center transition-colors relative overflow-hidden"
-                        onClick={(e) => {
-                          // Add ripple effect
-                          const button = e.currentTarget;
-                          const circle = document.createElement('span');
-                          const diameter = Math.max(button.clientWidth, button.clientHeight);
-                          const radius = diameter / 2;
-                          
-                          circle.style.width = circle.style.height = `${diameter}px`;
-                          circle.style.left = `${e.clientX - button.getBoundingClientRect().left - radius}px`;
-                          circle.style.top = `${e.clientY - button.getBoundingClientRect().top - radius}px`;
-                          circle.classList.add('ripple-effect');
-                          
-                          const ripple = button.getElementsByClassName('ripple-effect')[0];
-                          if (ripple) {
-                            ripple.remove();
-                          }
-                          
-                          button.appendChild(circle);
-                          
-                          // Then proceed with the normal handler after a tiny delay
-                          setTimeout(() => {
-                            handleBuyCredits();
-                          }, 10);
-                        }}
+                        onClick={handleBuyCredits}
+                        disabled={isRedirecting}
                         aria-label="Buy Credits"
                       >
-                        Buy Credits
+                        {isRedirecting ? (
+                          <>
+                            <span className="inline-block h-3 w-3 mr-1 animate-spin rounded-full border border-white border-t-transparent" />
+                            <span>Loading</span>
+                          </>
+                        ) : (
+                          "Buy Credits"
+                        )}
                       </Button>
                     </div>
                   )}
@@ -686,11 +682,21 @@ export default function Home() {
             {/* Reverted original text */}
             <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT 20$ when you can do it for 1$?</p>
             <p className="text-xs text-ghibli-dark/70 mb-3">Get 10 transforms for just $1!</p>
-            {/* Reverted button styling if needed */}
+            {/* MODIFIED: Updated Buy Credits button */}
             <button
               onClick={handleBuyCredits}
+              disabled={isRedirecting}
               className="w-full bg-amber-500 text-white py-2 rounded text-sm hover:bg-amber-600 transition-colors"
-            > Buy Credits </button>
+            >
+              {isRedirecting ? (
+                <>
+                  <span className="inline-block h-3 w-3 mr-1 animate-spin rounded-full border border-white border-t-transparent" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                "Buy Credits"
+              )}
+            </button>
           </motion.div>
         )}
 
