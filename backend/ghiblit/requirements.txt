@@ -64,3 +64,5 @@ pytz==2023.3
 django-storages[boto3]
 python-decouple
 pytesseract
+gunicorn==21.2.0
+whitenoise==6.5.0
