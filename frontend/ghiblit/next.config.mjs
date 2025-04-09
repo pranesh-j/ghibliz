@@ -2,7 +2,7 @@
 const nextConfig = {
   /* config options here */
   images: {
-    domains: ['https://ghiblit-backend.onrender.com'],
+    domains: ['ghiblit-backend.onrender.com'],
     minimumCacheTTL: 3600, // Cache images for at least 1 hour
   },
   // Add caching strategies
@@ -12,7 +12,9 @@ const nextConfig = {
     // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 4,
   },
+  // Enable React Strict Mode for improved development
   reactStrictMode: true,
+  // Experimental features
   experimental: {
     // Remove the invalid staticPageGenerationTimeout property
   },
