@@ -1,7 +1,7 @@
 "use client"
 
 import type { ReactNode } from "react"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useCallback, useRef, Suspense } from "react"
 import { Playfair_Display, Inter } from "next/font/google"
 import { usePathname, useSearchParams } from "next/navigation"
 import "./globals.css"
@@ -24,18 +24,13 @@ const playfair = Playfair_Display({
   display: 'swap',
 })
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode
-}) {
+// Separate component that uses useSearchParams
+function LayoutContent({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [contentVisible, setContentVisible] = useState(false);
   const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
   
   const handleLoading = useCallback(() => {
     setLoading(true);
@@ -144,6 +139,31 @@ export default function RootLayout({
   }, [pathname, searchParams, handleLoading]);
   
   return (
+    <>
+      <LoadingScreen show={loading} />
+      
+      <div 
+        className="content-container"
+        style={{
+          opacity: contentVisible ? 1 : 0,
+          visibility: contentVisible ? 'visible' : 'hidden',
+          pointerEvents: contentVisible && !loading ? 'auto' : 'none',
+        }}
+      >
+        {children}
+      </div>
+    </>
+  );
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: ReactNode
+}) {
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+  
+  return (
     <html lang="en">
       <head>
         <link rel="preload" href="/ghiblit-logo.jpg" as="image" />
@@ -158,23 +178,16 @@ export default function RootLayout({
           }
         `}</style>
       </head>
-      <body className={`${inter.className} ${playfair.variable} ${loading ? 'initial-load' : ''} overflow-x-hidden`}>
+      <body className={`${inter.className} ${playfair.variable} overflow-x-hidden`}>
         <GoogleOAuthProvider clientId={googleClientId}>
           <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
             <AuthProvider>
               <ToastProvider>
-                <LoadingScreen show={loading} />
-                
-                <div 
-                  className="content-container"
-                  style={{
-                    opacity: contentVisible ? 1 : 0,
-                    visibility: contentVisible ? 'visible' : 'hidden',
-                    pointerEvents: contentVisible && !loading ? 'auto' : 'none',
-                  }}
-                >
-                  {children}
-                </div>
+                <Suspense fallback={<div>Loading...</div>}>
+                  <LayoutContent>
+                    {children}
+                  </LayoutContent>
+                </Suspense>
               </ToastProvider>
             </AuthProvider>
           </ThemeProvider>

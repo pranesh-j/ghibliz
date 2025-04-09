@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, Suspense } from "react"
 import { motion } from "framer-motion"
 import { Upload, Download, Share2, Loader2, LogIn, UserPlus, ArrowRight, RefreshCw, CreditCard, X, ZoomIn } from "lucide-react" 
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,7 @@ import ImageService, { RecentImage } from "@/services/imageService"
 import { useRouter } from "next/navigation"
 import { Footer } from "@/components/footer"
 
-export default function Home() {
+function HomeContent() {
   const { user, isAuthenticated, logout, loading: authLoading, refreshUserProfile } = useAuth()
   const { toast } = useToast()
   const router = useRouter();
@@ -670,5 +670,13 @@ export default function Home() {
         <Footer />
       </div>
     </main>
+  )
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <HomeContent />
+    </Suspense>
   )
 }
