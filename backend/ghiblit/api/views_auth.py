@@ -1,4 +1,3 @@
-# api/views_auth.py
 import os
 import logging
 from django.contrib.auth.models import User
@@ -10,10 +9,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from users.models import UserProfile
-from django.core.cache import cache # Import cache
+from django.core.cache import cache 
 
-
-# Configure logging
 logger = logging.getLogger(__name__)
 
 class GoogleLoginView(APIView):
@@ -30,7 +27,6 @@ class GoogleLoginView(APIView):
             )
 
         try:
-            # Get Google Client ID from environment
             CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID')
 
             if not CLIENT_ID:
@@ -40,28 +36,22 @@ class GoogleLoginView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 
-            # Verify the token
             idinfo = id_token.verify_oauth2_token(
                 id_token_jwt,
                 google_requests.Request(),
                 CLIENT_ID
             )
 
-            # Get user info from the ID token
             if idinfo['iss'] not in ['accounts.google.com', 'https://accounts.google.com']:
                 raise ValueError('Invalid token issuer')
 
-            # Extract user data
             google_id = idinfo['sub']
             email = idinfo.get('email', '')
-
-            # Get name information
             name = idinfo.get('name', '')
             given_name = idinfo.get('given_name', '')
             family_name = idinfo.get('family_name', '')
 
             if not given_name and name:
-                # If we only have full name, try to split it
                 name_parts = name.split(' ', 1)
                 given_name = name_parts[0]
                 family_name = name_parts[1] if len(name_parts) > 1 else ''
@@ -70,14 +60,10 @@ class GoogleLoginView(APIView):
 
             logger.info(f"Google user authenticated: {email}")
 
-            # Check if user exists, otherwise create a new one
             user = None
-            profile_created = False # Flag to check if profile was newly created
+            profile_created = False
             try:
-                # Try to find user by email first (recommended approach)
                 user = User.objects.get(email=email)
-
-                # Update names if they've changed
                 if user.first_name != given_name or user.last_name != family_name:
                     user.first_name = given_name
                     user.last_name = family_name
@@ -85,10 +71,7 @@ class GoogleLoginView(APIView):
                     logger.info(f"Updated user profile names for {email}")
 
             except User.DoesNotExist:
-                # Create new user
-                username = f"google_{google_id}"[:30]  # Max 30 chars
-
-                # Make username unique if it already exists
+                username = f"google_{google_id}"[:30]
                 base_username = username
                 counter = 1
                 while User.objects.filter(username=username).exists():
@@ -104,23 +87,19 @@ class GoogleLoginView(APIView):
                 logger.info(f"Created new user for {email}")
 
             profile, created = UserProfile.objects.get_or_create(user=user)
-            profile_created = created # Store if the profile was just made
+            profile_created = created
 
             if profile_created:
                 profile.credit_balance = 1
-                # Ensure free_transform_used is False initially if you keep the field
                 profile.free_transform_used = False
                 profile.save()
                 logger.info(f"Granted 1 initial credit to new user {email}")
                 cache.delete(f'user_profile_{user.id}')
 
-            # Invalidate cache for this user upon login/signup to ensure fresh data
             cache.delete(f'user_profile_{user.id}')
 
-            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
 
-            # Fetch the latest profile state AFTER potential update
             profile.refresh_from_db()
 
             return Response({
@@ -134,20 +113,18 @@ class GoogleLoginView(APIView):
                     'last_name': user.last_name,
                     'profile': {
                         'credit_balance': profile.credit_balance,
-                        'free_transform_used': profile.free_transform_used, # Keep sending if frontend uses it
+                        'free_transform_used': profile.free_transform_used,
                     }
                 }
             })
 
         except ValueError as e:
-            # Invalid token
             logger.error(f"Invalid Google token: {str(e)}")
             return Response(
                 {'error': str(e)},
                 status=status.HTTP_401_UNAUTHORIZED
             )
         except Exception as e:
-            # Other errors
             logger.exception(f"Google authentication error: {str(e)}")
             return Response(
                 {'error': f'Authentication failed: {str(e)}'},

@@ -8,18 +8,14 @@ from decouple import config
 # Load environment variables
 load_dotenv()
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-temporary-key-for-development')
 
-# SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
-# Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -27,15 +23,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third-party apps
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
     'rest_framework_simplejwt.token_blacklist',
     'storages',
-    
-    # Project apps
     'api',
     'users',
     'images',
@@ -82,7 +74,6 @@ DATABASES = {
     )
 }
 
-
 STORAGES = {
     "default": {
         "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
@@ -94,29 +85,20 @@ STORAGES = {
 
 DEFAULT_FILE_STORAGE = 'config.storage.GeneratedImagesStorage'
 
-# Supabase S3 credentials
 AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')
 AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')
 AWS_STORAGE_BUCKET_NAME = 'ghiblits'
-SUPABASE_PAYMENTS_BUCKET_NAME = os.getenv('SUPABASE_PAYMENTS_BUCKET_NAME', 'payments') #
-
-# This is the crucial part - we're using S3 API for upload but not for download URLs
+SUPABASE_PAYMENTS_BUCKET_NAME = os.getenv('SUPABASE_PAYMENTS_BUCKET_NAME', 'payments')
 AWS_S3_ENDPOINT_URL = f"https://{config('SUPABASE_PROJECT_ID')}.supabase.co/storage/v1/s3"
 
+AWS_QUERYSTRING_AUTH = False
+AWS_DEFAULT_ACL = 'public-read'
+AWS_S3_FILE_OVERWRITE = False
 
-
-# These settings ensure proper file handling
-AWS_QUERYSTRING_AUTH = False  # Don't add auth parameters to URLs
-AWS_DEFAULT_ACL = 'public-read'  # Always make files public
-AWS_S3_FILE_OVERWRITE = False  # Don't overwrite files with the same name
-
-# Object parameters for caching, etc.
 AWS_S3_OBJECT_PARAMETERS = {
     'CacheControl': 'max-age=86400',
 }
 
-
-# Cache configuration with Redis
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -127,7 +109,6 @@ CACHES = {
     }
 }
 
-# If REDIS_URL is not set, fall back to in-memory cache for development
 if not os.environ.get('REDIS_URL'):
     CACHES = {
         'default': {
@@ -136,8 +117,6 @@ if not os.environ.get('REDIS_URL'):
         }
     }
 
-# Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -153,7 +132,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# REST Framework settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -164,7 +142,6 @@ REST_FRAMEWORK = {
     ],
 }
 
-# JWT settings
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -172,39 +149,30 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
 }
 
-# CORS settings
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    "http://localhost:5173",  # Vite default port
+    "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
-# Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
 
-# Media files
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Site ID for Django sites framework
 SITE_ID = 1
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')

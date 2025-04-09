@@ -1,7 +1,6 @@
-# payments/models.py
 from django.db import models
 from django.contrib.auth.models import User
-from config.storage import PaymentScreenshotsStorage  # Import the custom storage
+from config.storage import PaymentScreenshotsStorage
 
 class Payment(models.Model):
     PAYMENT_METHODS = (
@@ -27,12 +26,12 @@ class Payment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     reference_code = models.CharField(max_length=12, blank=True, null=True)
 
-    # Use the custom storage for screenshot field
+
     screenshot = models.ImageField(
         upload_to='payment_screenshots/', 
         null=True, 
         blank=True,
-        storage=PaymentScreenshotsStorage()  # This is the key change
+        storage=PaymentScreenshotsStorage() 
     )
     upi_id = models.CharField(max_length=255, null=True, blank=True)
     upi_reference = models.CharField(max_length=255, null=True, blank=True)
@@ -51,7 +50,6 @@ class Payment(models.Model):
         verbose_name_plural = 'Payments'
         ordering = ['-created_at']
 
-# Rest of your models remain unchanged
 class PricingPlan(models.Model):
     name = models.CharField(max_length=100)
     credits = models.IntegerField()
@@ -68,7 +66,6 @@ class PricingPlan(models.Model):
         verbose_name = 'Pricing Plan'
         verbose_name_plural = 'Pricing Plans'
 
-# Add to payments/models.py
 class PaymentSession(models.Model):
     SESSION_STATUS = (
         ('pending', 'Pending'),

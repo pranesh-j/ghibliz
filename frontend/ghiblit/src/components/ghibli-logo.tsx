@@ -2,9 +2,7 @@ export function GhibliLogo() {
   return (
     <div className="flex items-center gap-2">
       <div className="flex items-center">
-        {/* Thinner colored frame/background */}
         <div className="bg-amber-100 rounded-full p-0.5 flex items-center justify-center overflow-hidden border border-amber-200">
-          {/* Tree landscape logo */}
           <div className="w-8 h-8 rounded-full overflow-hidden">
             <img 
               src="/ghiblit.png" 
