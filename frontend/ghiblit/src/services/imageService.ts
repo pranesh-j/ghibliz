@@ -30,12 +30,10 @@ const ImageService = {
         formData.append('style', stylePreset); // Add the style parameter
 
         try {
-            // --- FIX: Removed leading /api/ ---
-            const response = await api.post<ImageTransformResponse>('transform/', formData); // Content-Type is set by interceptor
+            const response = await api.post<ImageTransformResponse>('api/transform/', formData);
             return response.data;
         } catch (error: any) {
             console.error("Image transform API error:", error.response?.data || error.message);
-            // Re-throw the error to allow the calling component (page.tsx) to handle specific status codes (like 402)
             throw error;
         }
     },
@@ -43,7 +41,7 @@ const ImageService = {
     getRecentImages: async (limit: number = 6): Promise<RecentImage[]> => {
         try {
             // --- FIX: Removed leading /api/ ---
-            const response = await api.get<RecentImage[]>(`images/recent/?limit=${limit}`);
+            const response = await api.get<RecentImage[]>(`api/images/recent/?limit=${limit}`);
             return response.data;
         } catch (error) {
             console.error("Get recent images API error:", error);
@@ -57,8 +55,8 @@ const ImageService = {
         try {
             // --- FIX: Removed leading /api/ ---
             // Adjust the endpoint if needed, e.g., 'images/download/{imageId}/?token={token}'
-            const response = await api.get<Blob>(`images/download/${imageId}/?token=${token}`, {
-                responseType: 'blob', // Important: expect binary data
+            const response = await api.get<Blob>(`api/images/download/${imageId}/?token=${token}`, {
+                responseType: 'blob',
             });
             return response.data;
         } catch (error) {
@@ -86,14 +84,12 @@ const ImageService = {
     },
 
 
-    // Share image (example, if backend provides a share URL)
+
     shareImage: async (imageId: number): Promise<ShareResponse> => {
         try {
-             // --- FIX: Removed leading /api/ ---
-             // Replace with your actual share endpoint if you have one
-            const response = await api.post<ShareResponse>(`images/${imageId}/share/`, {}); // Example POST
-            // Or GET if it just retrieves a URL:
-            // const response = await api.get<ShareResponse>(`/api/images/${imageId}/share/`);
+
+            const response = await api.post<ShareResponse>(`api/images/${imageId}/share/`, {});
+
             return response.data;
         } catch (error) {
             console.error("Share image API error:", error);

@@ -31,7 +31,7 @@ interface UserProfileResponse {
 const authService = {
     googleLogin: async (idToken: string): Promise<GoogleLoginResponse> => {
         try {
-            const response = await api.post<GoogleLoginResponse>('google-login/', {
+            const response = await api.post<GoogleLoginResponse>('api/google-login/', {
                 id_token: idToken,
             });
             console.log("authService: Google login API success:", response.data);
@@ -44,7 +44,7 @@ const authService = {
 
     getProfile: async (): Promise<UserProfileResponse> => {
         try {
-            const response = await api.get<UserProfileResponse>('profile/');
+            const response = await api.get<UserProfileResponse>('api/profile/');
             return response.data;
         } catch (error: any) {
             console.error("authService: Get profile API error:", error.response?.data || error.message);
