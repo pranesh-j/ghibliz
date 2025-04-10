@@ -21,27 +21,26 @@ export const OptimizedImage = memo(({
 }: ImageProps) => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
-  const imgRef = useRef<HTMLImageElement>(null)
+  const isMounted = useRef(true)
+  const imgRef = useRef<HTMLImageElement | null>(null)
   const placeholderColor = 'bg-gray-100'
   
   // Add support for image decode API for smoother loading
   useEffect(() => {
-    let isMounted = true
-    
-    const img = new Image()
+    let img = new Image()
     img.src = src
     
     // Use decode API if available
     if ('decode' in img) {
       img.decode()
         .then(() => {
-          if (isMounted && imgRef.current) {
+          if (isMounted.current && imgRef.current) {
             setLoading(false)
             if (onLoad) onLoad()
           }
         })
         .catch(() => {
-          if (isMounted) {
+          if (isMounted.current) {
             setError(true)
             setLoading(false)
           }
@@ -49,13 +48,13 @@ export const OptimizedImage = memo(({
     } else {
       // Fallback for browsers without decode support
       img.onload = () => {
-        if (isMounted) {
+        if (isMounted.current) {
           setLoading(false)
           if (onLoad) onLoad()
         }
       }
       img.onerror = () => {
-        if (isMounted) {
+        if (isMounted.current) {
           setError(true)
           setLoading(false)
         }
@@ -63,7 +62,7 @@ export const OptimizedImage = memo(({
     }
     
     return () => {
-      isMounted = false
+      isMounted.current = false
     }
   }, [src, onLoad])
   
