@@ -27,7 +27,7 @@ interface VerificationResponse {
 const paymentService = {
     getPricingPlans: async (): Promise<PricingPlan[]> => {
         try {
-            const response = await api.get<PricingPlan[]>('api/payments/plans/');
+            const response = await api.get<PricingPlan[]>('payments/plans/');
             return response.data;
         } catch (error) {
             console.error("Get pricing plans API error:", error);
@@ -37,7 +37,7 @@ const paymentService = {
 
     createPaymentSession: async (planId: number): Promise<PaymentSessionResponse> => {
         try {
-            const response = await api.post<PaymentSessionResponse>('api/payments/sessions/create/', {
+            const response = await api.post<PaymentSessionResponse>('payments/sessions/create/', {
                 plan_id: planId,
             });
             return response.data;
