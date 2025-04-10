@@ -1,7 +1,7 @@
 export const cleanupUnusedResources = () => {
     try {
       // Clean up object URLs
-      const objectURLs = [];
+      const objectURLs: string[] = [];
       
       // Track created object URLs
       const originalCreateObjectURL = URL.createObjectURL;
