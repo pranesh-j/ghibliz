@@ -623,7 +623,7 @@ export default function PaymentPage() {
                               Click to upload screenshot
                             </p>
                             <p className="text-xs text-ghibli-dark/70 mt-1">
-                              JPG, PNG or GIF (max 5MB)
+                              JPG, PNG (max 5MB)
                             </p>
                           </div>
                         ) : (

@@ -166,7 +166,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <link rel="preload" href="/ghiblit-logo.jpg" as="image" />
+        <link rel="preload" href="/ghiblit.webp" as="image" />
         <style>{`
           .content-container { 
             transition: opacity 0.8s ease-in-out;
