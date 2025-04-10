@@ -278,9 +278,7 @@ export function CloudBackground() {
       stopAnimation(); // Stop animation on unmount
       window.removeEventListener("resize", handleResize);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
-      // Clear refs if needed, though usually not necessary unless component remounts weirdly
-      // cloudsRef.current = [];
-      // cachedGradient.current = null;
+
     }
   }, []); // Run this main setup effect only ONCE on mount
 
