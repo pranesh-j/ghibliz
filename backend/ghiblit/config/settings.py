@@ -152,6 +152,8 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [
     "https://ghiblit-backend.onrender.com",
+    "https://www.ghiblit.art",
+    "https://ghiblit.art",
     "https://ghiblit-art.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
