@@ -27,42 +27,47 @@ export const OptimizedImage = memo(({
   
   // Add support for image decode API for smoother loading
   useEffect(() => {
-    let img = new Image()
-    img.src = src
-    
-    // Use decode API if available
-    if ('decode' in img) {
-      img.decode()
-        .then(() => {
-          if (isMounted.current && imgRef.current) {
+    if (imgRef.current) {
+      // Modern browsers with decode support
+      if (typeof imgRef.current.decode === 'function') {
+        imgRef.current.decode()
+          .then(() => {
+            if (isMounted.current) {
+              setLoading(false)
+              if (onLoad) onLoad()
+            }
+          })
+          .catch(() => {
+            if (isMounted.current) {
+              setError(true)
+              setLoading(false)
+            }
+          })
+      } else {
+        // Fallback for browsers without decode support
+        const handleLoad = () => {
+          if (isMounted.current) {
             setLoading(false)
             if (onLoad) onLoad()
           }
-        })
-        .catch(() => {
+        }
+
+        const handleError = () => {
           if (isMounted.current) {
             setError(true)
             setLoading(false)
           }
-        })
-    } else {
-      // Fallback for browsers without decode support
-      img.onload = () => {
-        if (isMounted.current) {
-          setLoading(false)
-          if (onLoad) onLoad()
+        }
+
+        imgRef.current.addEventListener('load', handleLoad)
+        imgRef.current.addEventListener('error', handleError)
+
+        // Clean up event listeners
+        return () => {
+          imgRef.current?.removeEventListener('load', handleLoad)
+          imgRef.current?.removeEventListener('error', handleError)
         }
       }
-      img.onerror = () => {
-        if (isMounted.current) {
-          setError(true)
-          setLoading(false)
-        }
-      }
-    }
-    
-    return () => {
-      isMounted.current = false
     }
   }, [src, onLoad])
   
