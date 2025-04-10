@@ -158,7 +158,10 @@ export const optimizeLayoutOperations = () => {
       get: function() { return true; }
     });
     
-    window.addEventListener('test', null, passiveIfSupported);
+    // Test if passive events are supported
+    const testEvent = () => {};
+    window.addEventListener('test', testEvent, passiveIfSupported);
+    window.removeEventListener('test', testEvent);
     
     // Add hints class for optimization
     document.documentElement.classList.add('passive-events-supported');
