@@ -49,7 +49,7 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
           >
             <div className="relative w-12 h-12 rounded-md overflow-hidden border border-gray-200 bg-gray-50">
               <img 
-                src={`/style-icons/${style.id}.png`} 
+                src={`/style-icons/${style.id}.webp`} 
                 alt={style.name}
                 className="w-full h-full object-cover"
                 onError={(e) => {

@@ -31,7 +31,7 @@ export function LoadingScreen({ show }: LoadingScreenProps) {
 
             <div className="w-16 h-16 rounded-xl overflow-hidden mb-6 shadow-lg">
               <img 
-                src="/ghiblit.png" 
+                src="/ghiblit.webp" 
                 alt="Ghiblit" 
                 className="w-full h-full object-cover"
               />

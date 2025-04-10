@@ -5,7 +5,7 @@ export function GhibliLogo() {
         <div className="bg-amber-100 rounded-full p-0.5 flex items-center justify-center overflow-hidden border border-amber-200">
           <div className="w-8 h-8 rounded-full overflow-hidden">
             <img 
-              src="/ghiblit.png" 
+              src="/ghiblit.webp" 
               alt="Ghiblit" 
               className="w-full h-full object-cover"
             />
