@@ -32,7 +32,17 @@ function LayoutContent({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   
+  // Add isInitialLoadRef
+  const isInitialLoadRef = useRef(true);
+  
   const handleLoading = useCallback(() => {
+    // Skip loading animation on subsequent navigations
+    if (!isInitialLoadRef.current && window.performance?.now() > 5000) {
+      setLoading(false);
+      setContentVisible(true);
+      return;
+    }
+    
     setLoading(true);
     setContentVisible(false);
     
@@ -41,91 +51,45 @@ function LayoutContent({ children }: { children: ReactNode }) {
     }
     
     const markContentReady = () => {
-      document.body.classList.add('loading-transition');
+      setContentVisible(true);
       
       loadingTimerRef.current = setTimeout(() => {
-        setContentVisible(true);
-        
-        loadingTimerRef.current = setTimeout(() => {
-          setLoading(false);
-          
-          loadingTimerRef.current = setTimeout(() => {
-            document.body.classList.remove('loading-transition');
-          }, 1000);
-        }, 800);
-      }, 200);
+        setLoading(false);
+        isInitialLoadRef.current = false;
+      }, 300);
     };
     
-    const checkImagesLoaded = () => {
-      const images = document.querySelectorAll('img');
-      const totalImages = images.length;
-      let loadedImages = 0;
-      
-      if (totalImages <= 3) {
-        loadingTimerRef.current = setTimeout(markContentReady, 600);
-        return;
-      }
-      
-      images.forEach(img => {
-        if (img.complete) {
-          loadedImages++;
-        } else {
-          img.addEventListener('load', () => {
-            loadedImages++;
-            if (loadedImages >= totalImages - 2) {
-              markContentReady();
-            }
-          });
-          
-          img.addEventListener('error', () => {
-            loadedImages++;
-            if (loadedImages >= totalImages - 2) {
-              markContentReady();
-            }
-          });
-        }
+    // Use requestIdleCallback if available
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => {
+        loadingTimerRef.current = setTimeout(markContentReady, 300);
       });
-      
-      if (loadedImages >= totalImages - 2) {
-        markContentReady();
-      }
-    };
-    
-    if (document.readyState === 'interactive' || document.readyState === 'complete') {
-      loadingTimerRef.current = setTimeout(checkImagesLoaded, 300);
     } else {
-      document.addEventListener('DOMContentLoaded', () => {
-        loadingTimerRef.current = setTimeout(checkImagesLoaded, 300);
-      }, { once: true });
+      loadingTimerRef.current = setTimeout(markContentReady, 500);
     }
     
+    // Safety timeout
     loadingTimerRef.current = setTimeout(() => {
       markContentReady();
-    }, 5000);
+    }, 3000);
   }, []);
   
+  // Update document body class for optimization
   useEffect(() => {
-    initializeOptimizations();
-    
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .loading-transition * {
-        transition: none !important;
-      }
-      
-      body {
-        overflow: ${loading ? 'hidden' : 'auto'};
-      }
-    `;
-    document.head.appendChild(style);
+    document.body.classList.add('optimize-scroll');
+    document.documentElement.style.scrollBehavior = 'smooth';
     
     return () => {
-      document.head.removeChild(style);
+      document.body.classList.remove('optimize-scroll');
+      document.documentElement.style.scrollBehavior = '';
     };
-  }, [loading]);
+  }, []);
   
+  // Only run loading effect on initial page load and real navigation events
   useEffect(() => {
-    handleLoading();
+    if (isInitialLoadRef.current) {
+      handleLoading();
+    }
     
     return () => {
       if (loadingTimerRef.current) {
@@ -134,16 +98,28 @@ function LayoutContent({ children }: { children: ReactNode }) {
     };
   }, [handleLoading]);
   
+  // Set up navigation listener
   useEffect(() => {
-    handleLoading();
-  }, [pathname, searchParams, handleLoading]);
+    const handleNavigation = () => {
+      if (!isInitialLoadRef.current) {
+        setContentVisible(true);
+        setLoading(false);
+      }
+    };
+    
+    window.addEventListener('pageshow', handleNavigation);
+    
+    return () => {
+      window.removeEventListener('pageshow', handleNavigation);
+    };
+  }, []);
   
   return (
     <>
       <LoadingScreen show={loading} />
       
       <div 
-        className="content-container"
+        className="content-container hardware-accelerated"
         style={{
           opacity: contentVisible ? 1 : 0,
           visibility: contentVisible ? 'visible' : 'hidden',

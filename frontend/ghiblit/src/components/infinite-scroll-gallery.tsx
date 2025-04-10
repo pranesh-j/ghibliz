@@ -1,22 +1,31 @@
-import React, { useEffect, useState, memo } from 'react';
+// src/components/infinite-scroll-gallery.tsx
+import React, { useEffect, useState, useRef, memo } from 'react';
 import ImageService, { RecentImage } from '@/services/imageService';
+import { OptimizedImage } from './image-component';
 
-const GalleryImage = memo(({ src, alt }: { src: string; alt: string }) => (
-  <div className="relative aspect-square overflow-hidden rounded-md">
-    <img 
-      src={src} 
-      alt={alt}
-      className="object-cover w-full h-full transition-transform hover:scale-105"
-      loading="lazy"
-    />
-  </div>
-));
-
-GalleryImage.displayName = 'GalleryImage';
-
+// Use IntersectionObserver to only animate when visible
 export default function InfiniteScrollGallery() {
   const [images, setImages] = useState<RecentImage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isVisible, setIsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const upperRowRef = useRef<HTMLDivElement>(null);
+  const lowerRowRef = useRef<HTMLDivElement>(null);
+  
+  // Use intersection observer to reduce animations when not visible
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    const observer = new IntersectionObserver(
+      (entries) => {
+        setIsVisible(entries[0].isIntersecting);
+      },
+      { threshold: 0.1 }
+    );
+    
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -34,11 +43,24 @@ export default function InfiniteScrollGallery() {
     fetchImages();
   }, []);
 
+  // Apply proper GPU acceleration to the animation
+  useEffect(() => {
+    if (!upperRowRef.current || !lowerRowRef.current) return;
+    
+    // Pause animations when not visible for performance
+    if (isVisible) {
+      upperRowRef.current.style.animationPlayState = 'running';
+      lowerRowRef.current.style.animationPlayState = 'running';
+    } else {
+      upperRowRef.current.style.animationPlayState = 'paused';
+      lowerRowRef.current.style.animationPlayState = 'paused';
+    }
+  }, [isVisible]);
+
   if (loading) {
     return <div className="flex justify-center p-4">Loading gallery...</div>;
   }
 
-  // Handle empty state
   if (images.length === 0) {
     return (
       <div className="w-full py-8">
@@ -48,20 +70,33 @@ export default function InfiniteScrollGallery() {
     );
   }
 
-  // Duplicate images to create infinite scrolling effect
-  const upperRowImages = [...images.slice(0, 10), ...images.slice(0, 10)]; 
+  // Only duplicate minimum necessary images
+  const upperRowImages = [...images.slice(0, 10), ...images.slice(0, 10)];
   const lowerRowImages = [...images.slice(10, 20), ...images.slice(10, 20)];
 
   return (
-    <div className="w-full overflow-hidden py-8">
+    <div ref={containerRef} className="w-full overflow-hidden py-8">
       <h2 className="text-center text-xl font-bold mb-4">Latest Transformations</h2>
       
       <div className="relative w-full overflow-hidden mb-4">
-        <div className="flex animate-marquee">
+        <div 
+          ref={upperRowRef}
+          className="flex animate-marquee"
+          style={{ 
+            width: '200%',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)',
+          }}
+        >
           {upperRowImages.map((image, index) => (
             image.processed && (
               <div key={`upper-${image.id}-${index}`} className="w-64 flex-shrink-0 p-2">
-                <GalleryImage src={image.processed} alt="Transformed image" />
+                <OptimizedImage 
+                  src={image.processed} 
+                  alt="Transformed image" 
+                  className="aspect-square rounded-md overflow-hidden"
+                />
               </div>
             )
           ))}
@@ -69,11 +104,24 @@ export default function InfiniteScrollGallery() {
       </div>
       
       <div className="relative w-full overflow-hidden">
-        <div className="flex animate-marquee-reverse">
+        <div 
+          ref={lowerRowRef}
+          className="flex animate-marquee-reverse"
+          style={{ 
+            width: '200%',
+            willChange: 'transform',
+            backfaceVisibility: 'hidden',
+            transform: 'translateZ(0)',
+          }}
+        >
           {lowerRowImages.map((image, index) => (
             image.processed && (
               <div key={`lower-${image.id}-${index}`} className="w-64 flex-shrink-0 p-2">
-                <GalleryImage src={image.processed} alt="Transformed image" />
+                <OptimizedImage 
+                  src={image.processed} 
+                  alt="Transformed image"
+                  className="aspect-square rounded-md overflow-hidden"
+                />
               </div>
             )
           ))}

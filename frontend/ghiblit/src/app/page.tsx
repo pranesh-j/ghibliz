@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useRef, useEffect, Suspense } from "react"
+import { useState, useRef, useEffect, Suspense, memo, useCallback } from "react"
+import dynamic from 'next/dynamic'
 import { motion } from "framer-motion"
 import { Upload, Download, Share2, Loader2, LogIn, UserPlus, ArrowRight, RefreshCw, CreditCard, X, ZoomIn } from "lucide-react" 
 import { Button } from "@/components/ui/button"
@@ -8,12 +9,18 @@ import { CloudBackground } from "@/components/cloud-background"
 import { LoginModal } from "@/components/login-modal"
 import { SignupModal } from "@/components/signup-modal"
 import { GhibliLogo } from "@/components/ghibli-logo"
-import { StylePresets } from "@/components/style-presets"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
 import ImageService, { RecentImage } from "@/services/imageService"
 import { useRouter } from "next/navigation"
 import { Footer } from "@/components/footer"
+
+// Lazy load non-critical components
+import { StylePresets } from '@/components/style-presets'
+
+// Memoize static components
+const MemoizedFooter = memo(Footer)
+const MemoizedCloudBackground = memo(CloudBackground)
 
 function HomeContent() {
   const { user, isAuthenticated, logout, loading: authLoading, refreshUserProfile } = useAuth()
@@ -92,27 +99,21 @@ function HomeContent() {
     fetchRecentWorks()
   }, [toast])
 
-  const handleStyleChange = (style: string) => {
+  const handleStyleChange = useCallback((style: string) => {
     setSelectedStyle(style);
-  }
+  }, [])
 
-  const handleViewImage = (type: "original" | "processed") => {
+  const handleViewImage = useCallback((type: "original" | "processed") => {
     const targetImage = type === "original" ? selectedImage : processedImage;
     if (!targetImage) {
       toast({ title: "Image not available", description: `${type.charAt(0).toUpperCase() + type.slice(1)} image is not loaded.`, variant: "error" });
       return;
     }
-    console.log(`Viewing ${type} image:`, targetImage);
     setViewingImage(type);
     setIsFullView(true);
-  }
+  }, [selectedImage, processedImage, toast])
 
-  const handleCloseViewer = () => {
-    setViewingImage(null);
-    setIsFullView(false);
-  }
-
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
@@ -146,7 +147,7 @@ function HomeContent() {
       }
     }
     reader.readAsDataURL(file)
-  }
+  }, [isAuthenticated, user, selectedStyle, toast, refreshUserProfile, fileInputRef])
 
   const processImage = async (file: File) => {
     setIsProcessing(true)
@@ -386,7 +387,7 @@ function HomeContent() {
 
   return (
     <main className="relative min-h-screen overflow-x-hidden">
-      <CloudBackground />
+      <MemoizedCloudBackground />
       <div className="relative z-10 min-h-screen">
         <header className="pt-3 sm:pt-4 px-3 md:px-8">
           <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -667,16 +668,17 @@ function HomeContent() {
         <SignupModal open={signupOpen} onOpenChange={setSignupOpen} onSwitchToLogin={handleSwitchToLogin} />
         
 
-        <Footer />
+        <MemoizedFooter />
       </div>
     </main>
   )
 }
 
-export default function Home() {
+// Use React.memo for the entire component
+export default memo(function Home() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
       <HomeContent />
     </Suspense>
   )
-}
+})

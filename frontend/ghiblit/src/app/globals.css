@@ -3,16 +3,19 @@
 @tailwind utilities;
 
 :root {
+  /* Ghibli theme colors as direct hex values */
   --ghibli-blue: #5EBFE2;
   --ghibli-green: #59A459;
   --ghibli-cream: #FFF6C8;
   --ghibli-dark: #5A4A3F;
 }
 
+/* Font family setup */
 .font-playfair {
   font-family: var(--font-playfair), serif;
 }
 
+/* Custom Ghibli theme utility classes with direct values */
 .bg-ghibli-blue {
   background-color: #5EBFE2;
 }
@@ -45,6 +48,7 @@
   color: #5A4A3F;
 }
 
+/* Additional styling */
 .transform-title {
   font-size: 5rem;
   line-height: 1.1;
@@ -78,36 +82,41 @@ h1, h2, h3, h4, h5, h6 {
   animation: marquee 45s linear infinite;
   min-width: 200%;
 }
-
 .animate-marquee-reverse {
   animation: marquee-reverse 45s linear infinite;
   min-width: 200%;
 }
 
+/* Add this to globals.css */
+
+/* Custom scrollbar styling */
+/* For Webkit browsers (Chrome, Safari, newer Edge) */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 8px; /* Thinner scrollbar */
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(176, 224, 230, 0.3);
+  background: rgba(176, 224, 230, 0.3); /* Light blue from your theme - transparent */
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(245, 158, 11, 0.5);
+  background: rgba(245, 158, 11, 0.5); /* Amber color from your theme - semi-transparent */
   border-radius: 10px;
-  border: 2px solid rgba(176, 224, 230, 0.1);
+  border: 2px solid rgba(176, 224, 230, 0.1); /* Light border */
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(245, 158, 11, 0.7);
+  background: rgba(245, 158, 11, 0.7); /* Darker on hover */
 }
 
+/* For Firefox */
 html {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(245, 158, 11, 0.5) rgba(176, 224, 230, 0.3);
+  scrollbar-width: thin; /* "thin", "auto", or "none" */
+  scrollbar-color: rgba(245, 158, 11, 0.5) rgba(176, 224, 230, 0.3); /* thumb and track color */
 }
 
+/* Make sure the main container allows scrolling but hides horizontal overflow */
 html, body {
   overflow-x: hidden;
   overflow-y: auto;
@@ -116,6 +125,7 @@ html, body {
   width: 100%;
 }
 
+/* Keep canvas from causing overflow */
 canvas {
   display: block;
 }

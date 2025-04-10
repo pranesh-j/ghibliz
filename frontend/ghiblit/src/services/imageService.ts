@@ -21,6 +21,49 @@ interface ShareResponse {
     share_url: string;
 }
 
+// Add in-memory cache for recent images
+const imageCache = new Map<string, string>();
+
+const cachedFetch = async (url: string): Promise<string> => {
+  if (imageCache.has(url)) {
+    return imageCache.get(url)!;
+  }
+  
+  try {
+    // Check if the browser cache API is available
+    if ('caches' in window) {
+      const cache = await caches.open('ghiblit-image-cache');
+      const cachedResponse = await cache.match(url);
+      
+      if (cachedResponse) {
+        const blob = await cachedResponse.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        imageCache.set(url, objectUrl);
+        return objectUrl;
+      }
+    }
+    
+    // Fallback to network request if not in cache
+    const response = await fetch(url, { cache: 'force-cache' });
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    
+    // Store in memory cache
+    imageCache.set(url, objectUrl);
+    
+    // Also store in browser cache if available
+    if ('caches' in window) {
+      const cache = await caches.open('ghiblit-image-cache');
+      cache.put(url, new Response(blob));
+    }
+    
+    return objectUrl;
+  } catch (error) {
+    console.error('Error fetching and caching image:', error);
+    return url; // Fallback to original URL
+  }
+};
+
 const ImageService = {
     // Transform image
 // Update this function in src/services/imageService.ts
@@ -40,12 +83,22 @@ const ImageService = {
     // Get recent images
     getRecentImages: async (limit: number = 6): Promise<RecentImage[]> => {
         try {
-            // --- FIX: Removed leading /api/ ---
             const response = await api.get<RecentImage[]>(`api/images/recent/?limit=${limit}`);
-            return response.data;
+            const images = response.data;
+            
+            // Pre-cache all images
+            for (const image of images) {
+                if (image.processed) {
+                    cachedFetch(image.processed).catch(console.error);
+                }
+                if (image.original) {
+                    cachedFetch(image.original).catch(console.error);
+                }
+            }
+            
+            return images;
         } catch (error) {
             console.error("Get recent images API error:", error);
-            // Return empty array or throw error based on how you want to handle this
             return [];
         }
     },
