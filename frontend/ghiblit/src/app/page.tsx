@@ -48,6 +48,11 @@ function HomeContent() {
     router.prefetch('/payment');
   }, [router]);
 
+  // Function to close the image viewer
+  const handleCloseViewer = () => {
+    setViewingImage(null);
+    setIsFullView(false);
+  };
 
   const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     if (viewingImage === "processed" && selectedImage && e.currentTarget) {
