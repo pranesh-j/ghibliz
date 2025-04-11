@@ -29,29 +29,52 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
   };
 
   const getGridColsClass = () => {
-
     return "grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9";
   };
 
+  // Add styles for hover animation without blur
+  const styleItemStyles = `
+    @media (prefers-reduced-motion: no-preference) {
+      .style-item {
+        transition: background-color 0.2s ease;
+      }
+      .style-item-image {
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .style-item:hover .style-item-image {
+        border-color: #FDB81E;
+        box-shadow: 0 0 0 2px rgba(253, 184, 30, 0.2);
+      }
+      .style-item.selected {
+        background-color: rgba(251, 191, 36, 0.2);
+      }
+      .style-item.selected .style-item-image {
+        border-color: #FDB81E;
+        box-shadow: 0 0 0 3px rgba(253, 184, 30, 0.3);
+      }
+    }
+  `;
+
   return (
     <div className="w-full max-w-3xl mx-auto mt-2 bg-white/90 backdrop-blur-sm rounded-xl border border-amber-100 shadow-sm p-3">
+      <style>{styleItemStyles}</style>
       <p className="text-center text-ghibli-dark text-xs mb-2">Choose your style</p>
       <div className={`grid ${getGridColsClass()} gap-2 justify-items-center`}>
         {presets.map((style) => (
           <div 
             key={style.id}
-            className={`flex flex-col items-center cursor-pointer transition-all px-1 py-1 rounded ${
-              selectedStyle === style.id 
-                ? 'bg-amber-50 border border-amber-200' 
-                : 'hover:bg-gray-50'
+            className={`flex flex-col items-center cursor-pointer px-1 py-1 rounded style-item ${
+              selectedStyle === style.id ? 'selected' : ''
             }`}
             onClick={() => handleStyleSelect(style.id)}
+            style={{ minHeight: '64px' }} // Fixed height to prevent layout shifts
           >
-            <div className="relative w-12 h-12 rounded-md overflow-hidden border border-gray-200 bg-gray-50">
+            <div className="relative w-12 h-12 rounded-md overflow-hidden border border-gray-200 bg-gray-50 style-item-image">
               <img 
                 src={`/style-icons/${style.id}.webp`} 
                 alt={style.name}
                 className="w-full h-full object-cover"
+                loading="lazy"
                 onError={(e) => {
                   // Fallback to colored background if image fails to load
                   const target = e.currentTarget as HTMLImageElement;
@@ -77,7 +100,6 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
                   }
                 }}
               />
-              
             
               {style.isDefault && !defaultChanged && (
                 <div className="absolute top-0 left-0 bg-amber-400 text-white text-xs px-1 rounded-br text-[8px]">
@@ -86,7 +108,6 @@ export function StylePresets({ onSelectStyle }: { onSelectStyle?: (style: string
               )}
               
               {selectedStyle === style.id && (
-
                 (defaultChanged || !style.isDefault) && (
                   <div className="absolute top-0 right-0 w-4 h-4 flex items-center justify-center bg-amber-400 rounded-bl">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="white" className="w-2.5 h-2.5">
