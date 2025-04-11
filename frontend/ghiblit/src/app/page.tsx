@@ -565,8 +565,8 @@ function HomeContent() {
                           {isProcessing ? (
                             <div className="w-full h-full flex items-center justify-center bg-amber-50/50">
                               <div className="text-center">
-                                <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 text-amber-500 animate-spin mx-auto mb-2 sm:mb-3" />
-                                <p className="text-xs sm:text-sm text-ghibli-dark/70">Creating magic...</p>
+                                <Loader2 className="w-8 h-8 text-ghibli-dark animate-spin mx-auto mb-2 sm:mb-3" />
+                                <p className="text-xs text-ghibli-dark/70">Creating magic...</p>
                               </div>
                             </div>
                           ) : processedImage ? (
@@ -624,15 +624,67 @@ function HomeContent() {
                 <>
                   <div className="relative w-full overflow-hidden mb-3 sm:mb-4">
                     <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
-                    <motion.div className="flex gap-3 sm:gap-4" initial={{ x: 0 }} animate={{ x: "-50%" }} transition={{ duration: 30, repeat: Infinity, ease: "linear", repeatType: "loop" }} style={{ width: "200%" }}>
-                      {[...recentWorks, ...recentWorks].map((item, index) => ( <div key={`top-${item.id}-${index}`} className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow w-40 sm:w-60"> <div className="aspect-[4/3] relative"> <img src={item.original || "/api/placeholder/400/300"} alt={`Original ${item.id}`} className="w-full h-full object-cover" onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"} /> </div> </div> ))}
+                    <motion.div 
+                      className="flex gap-3 sm:gap-4"
+                      initial={{ x: 0 }}
+                      animate={{ x: "-50%" }}
+                      transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+                      style={{ 
+                        width: "200%", 
+                        willChange: "transform",
+                        backfaceVisibility: "hidden",
+                        transform: "translateZ(0)"
+                      }}
+                    >
+                      {[...recentWorks, ...recentWorks].map((item, index) => (
+                        <div 
+                          key={`top-${item.id}-${index}`} 
+                          className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
+                          style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
+                        >
+                          <div className="aspect-[4/3] relative">
+                            <img 
+                              src={item.original || "/api/placeholder/400/300"} 
+                              alt={`Original ${item.id}`} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"} 
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </motion.div>
                     <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
                   </div>
                   <div className="relative w-full overflow-hidden">
                     <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
-                    <motion.div className="flex gap-3 sm:gap-4" initial={{ x: "-50%" }} animate={{ x: "0%" }} transition={{ duration: 30, repeat: Infinity, ease: "linear", repeatType: "loop" }} style={{ width: "200%" }}>
-                      {[...recentWorks, ...recentWorks].map((item, index) => ( <div key={`bottom-${item.id}-${index}`} className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow w-40 sm:w-60"> <div className="aspect-[4/3] relative"> <img src={item.processed || "/api/placeholder/400/300"} alt={`Processed ${item.id}`} className="w-full h-full object-cover" onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"}/> </div> </div> ))}
+                    <motion.div 
+                      className="flex gap-3 sm:gap-4"
+                      initial={{ x: "-50%" }}
+                      animate={{ x: "0%" }}
+                      transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+                      style={{ 
+                        width: "200%", 
+                        willChange: "transform",
+                        backfaceVisibility: "hidden",
+                        transform: "translateZ(0)"
+                      }}
+                    >
+                      {[...recentWorks, ...recentWorks].map((item, index) => (
+                        <div 
+                          key={`bottom-${item.id}-${index}`} 
+                          className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
+                          style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
+                        >
+                          <div className="aspect-[4/3] relative">
+                            <img 
+                              src={item.processed || "/api/placeholder/400/300"} 
+                              alt={`Processed ${item.id}`} 
+                              className="w-full h-full object-cover"
+                              onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </motion.div>
                     <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
                   </div>
