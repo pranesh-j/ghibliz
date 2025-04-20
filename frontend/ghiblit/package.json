@@ -8,7 +8,6 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
-
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.0.5",
@@ -24,6 +23,7 @@
     "next-themes": "^0.2.1",
     "react": "^18",
     "react-dom": "^18",
+    "standardwebhooks": "^1.0.0",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7"
   },

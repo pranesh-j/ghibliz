@@ -180,3 +180,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 SITE_ID = 1
 
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# Add to backend/ghiblit/config/settings.py
+
+# Dodo Payments Configuration
+DODO_API_KEY = os.environ.get('DODO_API_KEY', '')
+DODO_WEBHOOK_SECRET = os.environ.get('DODO_WEBHOOK_SECRET', '')
+DODO_TEST_MODE = os.environ.get('DODO_TEST_MODE', 'True') == 'True'
+
+# URLs for Dodo
+DODO_SUCCESS_URL = os.environ.get('DODO_SUCCESS_URL', 'https://ghiblit.art/payment/success')
+DODO_FAILURE_URL = os.environ.get('DODO_FAILURE_URL', 'https://ghiblit.art/payment/failed')

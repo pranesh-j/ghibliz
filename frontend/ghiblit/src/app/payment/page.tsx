@@ -1,126 +1,16 @@
+// frontend/ghiblit/src/app/payment/page.tsx
+
 "use client"
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowLeft, CheckCircle2, CreditCard, Loader2, QrCode, Smartphone, Upload, X, Info, Copy, Check } from "lucide-react"
+import { ArrowLeft, CheckCircle2, CreditCard, Loader2, Info } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { CloudBackground } from "@/components/cloud-background"
 import { GhibliLogo } from "@/components/ghibli-logo"
 import { useAuth } from "@/contexts/AuthContext"
 import { useToast } from "@/components/ui/toast"
-import api from "@/services/api"
-
-
-interface PaymentTimerProps {
-  expiresAt: string;
-  onExpire: () => void;
-}
-
-
-const PaymentTimer = ({ expiresAt, onExpire }: PaymentTimerProps) => {
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const router = useRouter();
-  
-  useEffect(() => {
-    if (!expiresAt) return;
-    
-    const calculateTimeLeft = () => {
-      const expiryTime = new Date(expiresAt).getTime();
-      const now = new Date().getTime();
-      return Math.max(0, Math.floor((expiryTime - now) / 1000));
-    };
-    
-    setCountdown(calculateTimeLeft());
-    
-    const timer = setInterval(() => {
-      const timeLeft = calculateTimeLeft();
-      setCountdown(timeLeft);
-      
-      if (timeLeft <= 0) {
-        clearInterval(timer);
-        
-        if (onExpire && typeof onExpire === 'function') {
-          onExpire();
-        } else {
-          router.refresh();
-        }
-      }
-    }, 1000);
-    
-    return () => clearInterval(timer);
-  }, [expiresAt, onExpire, router]);
-  
-  const formatTime = (seconds: number | null) => {
-    if (seconds === null) return '--:--';
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-  
-  return (
-    <div className="p-3 bg-blue-50 border border-blue-100 rounded-md mb-4">
-      <div className="flex items-start">
-        <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-sm text-blue-700">
-            <span className="font-medium">
-              Time remaining to complete payment: {formatTime(countdown)}
-            </span>
-          </p>
-          <p className="text-xs text-blue-600 mt-1">
-            Please make payment and upload screenshot before time expires
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-
-// Also need to add type for ReferenceCodeHighlighter 
-interface ReferenceCodeHighlighterProps {
-  referenceCode: string;
-}
-
-const ReferenceCodeHighlighter = ({ referenceCode }: ReferenceCodeHighlighterProps) => {
-  const [copied, setCopied] = useState(false);
-  
-  const handleCopy = () => {
-    navigator.clipboard.writeText(referenceCode);
-    setCopied(true);
-    
-    setTimeout(() => {
-      setCopied(false);
-    }, 2000);
-  };
-  
-  return (
-    <div className="mt-4 mb-4">
-      <p className="text-sm font-medium text-gray-700 mb-1">
-        Payment Reference Code (add to payment note):
-      </p>
-      <div className="flex items-center">
-        <div className="bg-amber-50 py-2 px-3 rounded-l border-l border-t border-b border-amber-200 flex-grow">
-          <code className="font-mono text-lg font-semibold tracking-wider">{referenceCode}</code>
-        </div>
-        <button
-          onClick={handleCopy}
-          className="bg-amber-100 hover:bg-amber-200 py-2 px-3 rounded-r border-r border-t border-b border-amber-200"
-          aria-label="Copy reference code"
-        >
-          {copied ? (
-            <Check className="h-5 w-5 text-green-600" />
-          ) : (
-            <Copy className="h-5 w-5 text-amber-700" />
-          )}
-        </button>
-      </div>
-      <p className="text-xs text-red-600 mt-2 font-medium">
-        Important: This exact code must be included in your payment note/reference field
-      </p>
-    </div>
-  );
-};
+import paymentService from "@/services/paymentService"
 
 interface PricingPlan {
   id: number;
@@ -130,185 +20,56 @@ interface PricingPlan {
   is_active: boolean;
 }
 
-interface PaymentSession {
-  session_id: number;
-  amount: number;
-  plan_name: string;
-  expires_at: string;
-  upi_link: string;              
-  qr_code_data: string;          
-  reference_code?: string;       
-}
-
 export default function PaymentPage() {
   const { user, isAuthenticated, refreshUserProfile } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   
-  const pricingPlans: PricingPlan[] = [
-    {
-      id: 1,
-      name: "Basic",
-      credits: 3,
-      price_inr: 49,
-      is_active: true
-    },
-    {
-      id: 2,
-      name: "Standard",
-      credits: 10,
-      price_inr: 99,
-      is_active: true
-    }
-  ];
-  
-  const [selectedPlan, setSelectedPlan] = useState<PricingPlan>(pricingPlans[0])
-  const [loading, setLoading] = useState(false)
+  const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([])
+  const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null)
+  const [loading, setLoading] = useState(true)
   const [creatingPayment, setCreatingPayment] = useState(false)
   
-
-  const [currentSession, setCurrentSession] = useState<PaymentSession | null>(null)
-  const [paymentMode, setPaymentMode] = useState<'link' | 'qr'>('link')
-  const [screenshot, setScreenshot] = useState<File | null>(null)
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [submittingVerification, setSubmittingVerification] = useState(false)
-  const [verificationComplete, setVerificationComplete] = useState(false)
+  // Payment status checking
+  const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null)
+  const [checkingStatus, setCheckingStatus] = useState(false)
+  const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   
-
-  const handleSessionExpired = () => {
-    toast({
-      title: "Session expired",
-      description: "Payment session has expired. Please create a new session.",
-      variant: "error"
-    });
-    
-
-    setCurrentSession(null);
-    setVerificationComplete(false);
-    setScreenshot(null);
-    setPreviewUrl(null);
-  };
-  
-
-  const handleCreatePayment = async () => {
-    if (!selectedPlan) return
-    
-    setCreatingPayment(true)
-    try {
-      const response = await api.post('/payments/sessions/create/', {
-        plan_id: selectedPlan.id
-      });
-      
-      setCurrentSession(response.data);
-      
-      toast({
-        title: "Payment initialized",
-        description: "Complete the payment using UPI",
-        variant: "success"
-      });
-    } catch (error) {
-      console.error("Failed to create payment session:", error)
-      toast({
-        title: "Payment initialization failed",
-        description: "Please try again",
-        variant: "error"
-      })
-    } finally {
-      setCreatingPayment(false)
-    }
-  }
-  
-  const handleScreenshotChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-    
-    if (!file.type.startsWith('image/')) {
-      toast({
-        title: "Invalid file",
-        description: "Please upload an image file",
-        variant: "error"
-      })
-      return
-    }
-    
-    if (file.size > 5 * 1024 * 1024) { 
-      toast({
-        title: "File too large",
-        description: "Screenshot must be less than 5MB",
-        variant: "error"
-      })
-      return
-    }
-    
-    setScreenshot(file)
-    
-
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string)
-    }
-    reader.readAsDataURL(file)
-  }
-
-
-  const handleVerifyPayment = async () => {
-    if (!currentSession || !screenshot) return
-    
-    setSubmittingVerification(true)
-    try {
-      const formData = new FormData();
-      formData.append('screenshot', screenshot);
-      
-      const response = await api.post(`/payments/sessions/${currentSession.session_id}/verify/`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      setVerificationComplete(true)
-      
-      await refreshUserProfile();
-      
-      toast({
-        title: "Verification successful",
-        description: response.data.message || "Credits have been added to your account",
-        variant: "success"
-      })
-    } catch (error: any) {
-      console.error("Verification error:", error);
-      
-      let errorMessage = "Verification failed. Please try again.";
-      let errorTitle = "Verification Failed";
-      
-      if (error.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error.message) {
-        errorMessage = error.message;
+  // Load pricing plans on component mount
+  useEffect(() => {
+    const fetchPricingPlans = async () => {
+      try {
+        setLoading(true)
+        const plans = await paymentService.getPricingPlans()
+        setPricingPlans(plans)
+        
+        // Auto-select first plan
+        if (plans.length > 0) {
+          setSelectedPlan(plans[0])
+        }
+      } catch (error) {
+        console.error("Failed to load pricing plans:", error)
+        toast({
+          title: "Failed to load packages",
+          description: "Please try again later",
+          variant: "error"
+        })
+      } finally {
+        setLoading(false)
       }
-      
-      toast({
-        title: errorTitle,
-        description: errorMessage,
-        variant: "error"
-      });
-      
-    } finally {
-      setSubmittingVerification(false)
     }
-  }
-
-  const handleReset = () => {
-    setCurrentSession(null)
-    setVerificationComplete(false)
-    setScreenshot(null)
-    setPreviewUrl(null)
-  }
+    
+    fetchPricingPlans()
+    
+    // Clean up interval when component unmounts
+    return () => {
+      if (statusCheckIntervalRef.current) {
+        clearInterval(statusCheckIntervalRef.current)
+      }
+    }
+  }, [toast])
   
-  const handleGoHome = () => {
-    router.push('/')
-  }
-
+  // Check authentication
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/')
@@ -319,6 +80,108 @@ export default function PaymentPage() {
       })
     }
   }, [isAuthenticated, router, toast])
+  
+  // Function to initiate payment
+  const handleCreatePayment = async () => {
+    if (!selectedPlan) {
+      toast({
+        title: "Select a package",
+        description: "Please select a package to continue",
+        variant: "warning"
+      })
+      return
+    }
+    
+    try {
+      setCreatingPayment(true)
+      const paymentResponse = await paymentService.createPayment(selectedPlan.id)
+      
+      // Start checking payment status
+      setCurrentPaymentId(paymentResponse.payment_id)
+      
+      // Redirect to payment page
+      window.location.href = paymentResponse.payment_url
+    } catch (error: any) {
+      console.error("Payment creation failed:", error)
+      toast({
+        title: "Payment initialization failed",
+        description: error.response?.data?.error || "Please try again later",
+        variant: "error"
+      })
+    } finally {
+      setCreatingPayment(false)
+    }
+  }
+  
+  // Function to check payment status
+  const checkPaymentStatus = async () => {
+    if (!currentPaymentId) return
+    
+    try {
+      setCheckingStatus(true)
+      const statusResponse = await paymentService.checkPaymentStatus(currentPaymentId)
+      
+      if (statusResponse.status === 'completed') {
+        // Payment successful
+        toast({
+          title: "Payment successful!",
+          description: `${statusResponse.credits_purchased} credits have been added to your account`,
+          variant: "success"
+        })
+        
+        // Stop checking status
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current)
+        }
+        
+        // Refresh user profile to get updated credit balance
+        await refreshUserProfile()
+        
+        // Redirect to home page after successful payment
+        router.push('/')
+      } else if (statusResponse.status === 'failed') {
+        // Payment failed
+        toast({
+          title: "Payment failed",
+          description: statusResponse.message || "Your payment was not successful",
+          variant: "error"
+        })
+        
+        // Stop checking status
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current)
+        }
+        
+        setCurrentPaymentId(null)
+      }
+      // For 'pending' or 'processing', we continue to wait
+    } catch (error) {
+      console.error("Failed to check payment status:", error)
+    } finally {
+      setCheckingStatus(false)
+    }
+  }
+  
+  // Set up interval to check payment status
+  useEffect(() => {
+    if (currentPaymentId) {
+      // Check immediately
+      checkPaymentStatus()
+      
+      // Set up interval to check every 5 seconds
+      statusCheckIntervalRef.current = setInterval(checkPaymentStatus, 5000)
+      
+      return () => {
+        if (statusCheckIntervalRef.current) {
+          clearInterval(statusCheckIntervalRef.current)
+        }
+      }
+    }
+  }, [currentPaymentId])
+
+  const handleGoHome = () => {
+    router.push('/')
+  }
 
   return (
     <main className="relative min-h-screen overflow-x-hidden">
@@ -362,376 +225,95 @@ export default function PaymentPage() {
               <Loader2 className="w-8 h-8 text-ghibli-dark animate-spin" />
             </div>
           ) : (
-            <>
-              <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
-                {!currentSession ? (
-                  <div>
-                    <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
-                      Choose a Package
-                    </h2>
-                    
-                    <div className="grid md:grid-cols-2 gap-4 mb-6">
-                      {pricingPlans.map((plan) => (
-                        <div
-                          key={plan.id}
-                          className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                            selectedPlan?.id === plan.id
-                              ? "border-amber-500 bg-amber-50"
-                              : "border-gray-200 hover:border-amber-300"
-                          }`}
-                          onClick={() => setSelectedPlan(plan)}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <h3 className="text-lg font-medium text-ghibli-dark">
-                              {plan.name} Package
-                            </h3>
-                            {selectedPlan?.id === plan.id && (
-                              <CheckCircle2 className="h-5 w-5 text-amber-500" />
-                            )}
-                          </div>
-                          <p className="text-3xl font-bold text-ghibli-dark mb-2">
-                            ₹{plan.price_inr}
-                          </p>
-                          <p className="text-sm text-ghibli-dark/80">
-                            {plan.credits} image transformations
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                    
-                    <Button
-                      className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg font-medium"
-                      onClick={handleCreatePayment}
-                      disabled={!selectedPlan || creatingPayment}
-                    >
-                      {creatingPayment ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="mr-2 h-4 w-4" />
-                          Proceed to Payment
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                ) : !verificationComplete ? (
-                  <div>
-                    <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
-                      Complete Your Payment
-                    </h2>
-                    
-                    <div className="bg-amber-50 p-4 rounded-lg mb-6">
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm text-ghibli-dark/80">Package:</span>
-                        <span className="text-sm font-medium text-ghibli-dark">
-                          {currentSession?.plan_name} ({selectedPlan?.credits} credits)
-                        </span>
-                      </div>
-                      <div className="flex justify-between mb-2">
-                        <span className="text-sm text-ghibli-dark/80">Amount:</span>
-                        <span className="text-sm font-medium text-ghibli-dark">
-                          ₹{currentSession.amount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-sm text-ghibli-dark/80">Order ID:</span>
-                        <span className="text-sm font-medium text-ghibli-dark">
-                          #{currentSession.session_id}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {currentSession && (
-                      <PaymentTimer 
-                        expiresAt={currentSession.expires_at}
-                        onExpire={handleSessionExpired}
-                      />
-                    )}
-                    
-                    {currentSession && currentSession.reference_code && (
-                      <ReferenceCodeHighlighter referenceCode={currentSession.reference_code} />
-                    )}
-                    
-                    <div className="flex border rounded-lg overflow-hidden mb-6">
-                      <button
-                        className={`flex-1 py-2 flex justify-center items-center ${
-                          paymentMode === 'link'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                        } transition-colors`}
-                        onClick={() => setPaymentMode('link')}
-                      >
-                        <Smartphone className="mr-2 h-4 w-4" />
-                        UPI Link
-                      </button>
-                      <button
-                        className={`flex-1 py-2 flex justify-center items-center ${
-                          paymentMode === 'qr'
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                        } transition-colors`}
-                        onClick={() => setPaymentMode('qr')}
-                      >
-                        <QrCode className="mr-2 h-4 w-4" />
-                        QR Code
-                      </button>
-                    </div>
-                    
-                    {paymentMode === 'link' && (
-                      <div className="mb-6">
-                        <p className="text-sm text-center text-ghibli-dark mb-4">
-                          Click the button below to open your UPI app
-                        </p>
-                        
-                        <div className="flex justify-center mb-4">
-                          <a
-                            href={currentSession.upi_link}
-                            className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-6 rounded-lg font-medium text-base flex items-center"
-                          >
-                            <Smartphone className="mr-2 h-5 w-5" />
-                            Proceed to UPI
-                          </a>
-                        </div>
-                        
-                        <div className="flex justify-center gap-6 items-center">
-                          <a 
-                            href={currentSession.upi_link}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
-                            <img
-                              src="/gpay.svg"
-                              alt="Google Pay"
-                              width={180}
-                              height={180}
-                              className="h-16 w-auto object-contain"
-                            />
-                          </a>
-                          <a 
-                            href={currentSession.upi_link}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
-                            <img
-                              src="/phonepe.svg"
-                              alt="PhonePe"
-                              width={180}
-                              height={180}
-                              className="h-16 w-auto object-contain"
-                            />
-                          </a>
-                          <a 
-                            href={currentSession.upi_link}
-                            className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-                          >
-                            <img
-                              src="/cred.svg"
-                              alt="cred"
-                              width={100}
-                              height={100}
-                              className="h-12 w-auto object-contain"
-                            />
-                          </a>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* QR Code */}
-                    {paymentMode === 'qr' && (
-                      <div className="mb-6">
-                        <div className="flex justify-center mb-4">
-                          <div className="bg-white p-3 rounded-lg border">
-                            <img
-                              src={currentSession.qr_code_data}
-                              alt="UPI QR Code"
-                              width={200}
-                              height={200}
-                              className="rounded"
-                            />
-                          </div>
-                        </div>
-                        <p className="text-sm text-center text-ghibli-dark mb-2">
-                          Scan with any UPI app to pay
-                        </p>
-                        <div className="flex justify-center gap-6 mb-1 items-center">
-                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <img
-                              src="/gpay.svg"
-                              alt="Google Pay"
-                              width={180}
-                              height={180}
-                              className="h-16 w-auto object-contain"
-                            />
-                          </div>
-                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <img
-                              src="/phonepe.svg"
-                              alt="PhonePe"
-                              width={180}
-                              height={180}
-                              className="h-16 w-auto object-contain"
-                            />
-                          </div>
-                          <div className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                            <img
-                              src="/cred.svg"
-                              alt="cred"
-                              width={100}
-                              height={100}
-                              className="h-12 w-auto object-contain"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Payment Verification Section */}
-                    <div className="border-t pt-6 mt-6">
-                      <h3 className="text-lg font-playfair text-ghibli-dark mb-4">
-                        Verify Your Payment
+            <div className="max-w-2xl mx-auto bg-white/90 backdrop-blur-sm rounded-xl shadow-lg p-6 mb-8">
+              <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
+                Choose a Package
+              </h2>
+              
+              <div className="grid md:grid-cols-2 gap-4 mb-6">
+                {pricingPlans.map((plan) => (
+                  <div
+                    key={plan.id}
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      selectedPlan?.id === plan.id
+                        ? "border-amber-500 bg-amber-50"
+                        : "border-gray-200 hover:border-amber-300"
+                    }`}
+                    onClick={() => setSelectedPlan(plan)}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-lg font-medium text-ghibli-dark">
+                        {plan.name} Package
                       </h3>
-                      
-                      <div className="mb-4 p-3 bg-red-50 border border-red-100 rounded-md">
-                        <p className="text-sm text-red-700 font-medium">Important Notice:</p>
-                        <p className="text-xs text-red-600 mt-1">
-                          Any use of fake screenshots or fraudulent transaction IDs will result in your account being permanently banned. All payments are verified automatically.
-                        </p>
-                      </div>
-                      
-                      {/* Screenshot Upload */}
-                      <div className="mb-4">
-                        <label className="block text-sm font-medium text-ghibli-dark mb-1">
-                          Upload Payment Screenshot
-                        </label>
-                        
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handleScreenshotChange}
-                          className="hidden"
-                        />
-                        
-                        {!previewUrl ? (
-                          <div 
-                            className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-amber-300 transition-colors"
-                            onClick={() => fileInputRef.current?.click()}
-                          >
-                            <Upload className="h-8 w-8 mx-auto text-ghibli-dark/50 mb-2" />
-                            <p className="text-sm text-ghibli-dark">
-                              Click to upload screenshot
-                            </p>
-                            <p className="text-xs text-ghibli-dark/70 mt-1">
-                              JPG, PNG (max 5MB)
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="relative border rounded-lg overflow-hidden">
-                            <img
-                              src={previewUrl}
-                              alt="Payment Screenshot"
-                              className="w-full h-auto max-h-48 object-contain"
-                            />
-                            <button
-                              className="absolute top-2 right-2 bg-white/80 rounded-full p-1 hover:bg-white/100 transition-colors"
-                              onClick={() => {
-                                setScreenshot(null);
-                                setPreviewUrl(null);
-                                if (fileInputRef.current) {
-                                  fileInputRef.current.value = "";
-                                }
-                              }}
-                            >
-                              <X className="h-4 w-4 text-ghibli-dark" />
-                            </button>
-                          </div>
-                        )}
-
-                        {/* Screenshot examples guide */}
-                        <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-xs font-medium text-ghibli-dark mb-2">
-                            Screenshot Guide:
-                          </p>
-                          <p className="text-xs text-ghibli-dark/80 mt-2 font-medium">
-                            <span className="text-blue-700">Important: Do not crop your screenshots as verification will fail for any cropped out screenshots. We don't store your screenshots after verification.</span>
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex gap-3 mt-6">
-                        <Button
-                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-lg font-medium"
-                          onClick={handleVerifyPayment}
-                          disabled={submittingVerification || !screenshot}
-                        >
-                          {submittingVerification ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Verifying Payment...
-                            </>
-                          ) : (
-                            "Verify Payment"
-                          )}
-                        </Button>
-                        
-                        <Button
-                          className="bg-gray-100 hover:bg-gray-200 text-ghibli-dark py-2 rounded-lg font-medium"
-                          onClick={handleReset}
-                          disabled={submittingVerification}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
+                      {selectedPlan?.id === plan.id && (
+                        <CheckCircle2 className="h-5 w-5 text-amber-500" />
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  /* Step 3: Verification Complete */
-                  <div className="text-center py-6">
-                    <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 className="h-8 w-8 text-green-600" />
-                    </div>
-                    
-                    <h2 className="text-xl font-playfair text-ghibli-dark mb-2">
-                      Payment Verified!
-                    </h2>
-                    
-                    <p className="text-ghibli-dark/80 mb-6 max-w-md mx-auto">
-                      Your payment has been verified and credits have been added to your account.
+                    <p className="text-3xl font-bold text-ghibli-dark mb-2">
+                      ₹{plan.price_inr}
                     </p>
-                    
-                    <div className="flex justify-center gap-4">
-                      <Button
-                        className="bg-amber-500 hover:bg-amber-600 text-white py-2 px-6 rounded-lg font-medium"
-                        onClick={handleGoHome}
-                      >
-                        Return to Home
-                      </Button>
-                      
-                      <Button
-                        className="bg-white border border-gray-200 hover:bg-gray-50 text-ghibli-dark py-2 px-6 rounded-lg font-medium"
-                        onClick={handleReset}
-                      >
-                        Make Another Payment
-                      </Button>
-                    </div>
+                    <p className="text-sm text-ghibli-dark/80">
+                      {plan.credits} image transformations
+                    </p>
                   </div>
-                )}
+                ))}
               </div>
               
-              {/* Information Box */}
-              <div className="max-w-2xl mx-auto">
-                <div className="bg-amber-50 rounded-lg p-4 text-sm text-ghibli-dark/80">
-                  <p className="font-medium text-ghibli-dark mb-2">Payment Information</p>
-                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Payments are verified automatically via screenshot</li>
-                    <li>Your payment must be completed within the countdown time</li>
-                    <li>For any issues, contact ghiblit@gmail.com</li>
-                  </ul>
+              <Button
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg font-medium"
+                onClick={handleCreatePayment}
+                disabled={!selectedPlan || creatingPayment}
+              >
+                {creatingPayment ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-2 h-4 w-4" />
+                    Proceed to Payment
+                  </>
+                )}
+              </Button>
+
+              {/* Payment Processing Info */}
+              {currentPaymentId && (
+                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  <div className="flex items-start">
+                    <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-blue-700">
+                        Payment Processing
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        {checkingStatus ? (
+                          <span className="flex items-center">
+                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                            Checking payment status...
+                          </span>
+                        ) : (
+                          "Complete the payment in the browser window that opened."
+                        )}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </>
+              )}
+            </div>
           )}
+          
+          {/* Information Box */}
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-amber-50 rounded-lg p-4 text-sm text-ghibli-dark/80">
+              <p className="font-medium text-ghibli-dark mb-2">Payment Information</p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Your payment is processed securely by Dodo Payments</li>
+                <li>Credits will be added to your account automatically after payment</li>
+                <li>For any issues, contact support@ghiblit.art</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </main>

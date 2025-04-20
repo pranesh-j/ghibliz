@@ -19,15 +19,15 @@ class Command(BaseCommand):
         PricingPlan.objects.create(
             name="Basic",
             credits=3,
-            price_usd=0.60,
-            price_inr=49.00,
+            price_usd=1,
+            price_inr=50.00,
             is_active=True
         )
 
         PricingPlan.objects.create(
             name="Standard",
             credits=10,
-            price_usd=1.20,
+            price_usd=2.49,
             price_inr=99.00,
             is_active=True
         )

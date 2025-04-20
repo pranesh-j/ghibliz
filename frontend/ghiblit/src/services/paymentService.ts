@@ -1,3 +1,5 @@
+// frontend/ghiblit/src/services/paymentService.ts
+
 import api from './api';
 
 interface PricingPlan {
@@ -8,67 +10,66 @@ interface PricingPlan {
     is_active: boolean;
 }
 
-interface PaymentSessionResponse {
-    session_id: number;
+interface CreatePaymentResponse {
+    payment_id: number;
+    dodo_payment_id: string;
+    payment_url: string;
     amount: number;
-    plan_name: string;
-    expires_at: string;
-    upi_link: string;
-    qr_code_data: string;
-    reference_code?: string;
+    credits: number;
+    status: string;
 }
 
-interface VerificationResponse {
-    message: string;
-    credits_added?: number;
-    total_credits?: number;
+interface PaymentStatusResponse {
+    payment_id: number;
+    status: string;
+    credits_purchased?: number;
+    credit_balance?: number;
+    message?: string;
+    error?: string;
 }
 
 const paymentService = {
     getPricingPlans: async (): Promise<PricingPlan[]> => {
         try {
-            const response = await api.get<PricingPlan[]>('payments/plans/');
+            const response = await api.get<PricingPlan[]>('api/payments/plans/');
             return response.data;
         } catch (error) {
-            console.error("Get pricing plans API error:", error);
+            console.error("Failed to fetch pricing plans:", error);
             throw error;
         }
     },
 
-    createPaymentSession: async (planId: number): Promise<PaymentSessionResponse> => {
+    createPayment: async (planId: number): Promise<CreatePaymentResponse> => {
         try {
-            const response = await api.post<PaymentSessionResponse>('payments/sessions/create/', {
+            const response = await api.post<CreatePaymentResponse>('api/payments/create/', {
                 plan_id: planId,
             });
             return response.data;
         } catch (error) {
-            console.error("Create payment session API error:", error);
+            console.error("Failed to create payment:", error);
             throw error;
         }
     },
 
-    verifyPayment: async (sessionId: number, screenshotFile: File): Promise<VerificationResponse> => {
-        const formData = new FormData();
-        formData.append('screenshot', screenshotFile);
-
+    checkPaymentStatus: async (paymentId: number): Promise<PaymentStatusResponse> => {
         try {
-            const response = await api.post<VerificationResponse>(`payments/sessions/${sessionId}/verify/`, formData);
+            const response = await api.get<PaymentStatusResponse>(`api/payments/${paymentId}/status/`);
             return response.data;
         } catch (error) {
-            console.error("Verify payment API error:", error);
+            console.error("Failed to check payment status:", error);
             throw error;
         }
     },
 
     getPaymentHistory: async (): Promise<any[]> => {
         try {
-            const response = await api.get<any[]>('payments/history/');
+            const response = await api.get<any[]>('api/payments/history/');
             return response.data;
         } catch (error) {
-            console.error("Get payment history API error:", error);
+            console.error("Failed to fetch payment history:", error);
             throw error;
         }
-    },
+    }
 };
 
 export default paymentService;
