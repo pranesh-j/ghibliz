@@ -100,27 +100,43 @@ class DodoPaymentsClient:
         Check the status of a payment
 
         Args:
-            payment_id: The Dodo payment ID [cite: 140]
+            payment_id: The Dodo payment ID
 
         Returns:
-            dict: Payment details including status [cite: 140]
+            dict: Payment details including status if successful
+            None: If there was an error and we're not raising exceptions
+
+        Raises:
+            requests.exceptions.RequestException: If configured to raise on errors
         """
         headers = {
-            "Authorization": f"Bearer {self.api_key}" # [cite: 140]
+            "Authorization": f"Bearer {self.api_key}"
         }
 
         try:
             response = requests.get(
-                f"{self.base_url}/payments/{payment_id}", # [cite: 141]
+                f"{self.base_url}/payments/{payment_id}",
                 headers=headers
             )
-            response.raise_for_status()
-            return response.json() # [cite: 141]
-        except requests.exceptions.RequestException as e: # [cite: 142]
-            logger.error(f"Failed to check Dodo payment status for {payment_id}: {str(e)}") # [cite: 142]
+            # Log raw response before raising status or parsing JSON
+            logger.info(f"Dodo get_payment_status raw response for {payment_id} - Status: {response.status_code}, Body: {response.text}")
+
+            response.raise_for_status()  # Check for HTTP errors first
+            return response.json()
+        except requests.exceptions.JSONDecodeError as json_err:
+            logger.error(f"Failed to decode JSON from Dodo status response for {payment_id}: {str(json_err)}. Body was: {response.text}")
+            # Decide how to handle - maybe return None or raise a specific error
+            return None  # Or raise custom error
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to check Dodo payment status for {payment_id}: {str(e)}")
             if hasattr(e, 'response') and e.response:
-                logger.error(f"Response: {e.response.text}") # [cite: 142]
-            raise
+                logger.error(f"Response: {e.response.text}")
+            # Decide how to handle - return None or raise
+            return None  # Or raise e
+        except Exception as ex:  # Catch any other unexpected errors
+            logger.exception(f"Unexpected error checking Dodo payment status for {payment_id}: {str(ex)}")
+            # Decide how to handle - return None or raise
+            return None  # Or raise ex
 
     def verify_webhook_signature(self, payload, signature, webhook_id, timestamp):
         """

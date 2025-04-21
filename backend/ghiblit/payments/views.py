@@ -101,63 +101,96 @@ def check_payment_status(request, payment_id):
     # Otherwise, check with Dodo API
     try:
         dodo_client = DodoPaymentsClient()
+        if not payment.dodo_payment_id:
+            logger.error(f"Payment {payment.id} is missing dodo_payment_id.")
+            return Response(
+                {"error": "Payment record is incomplete (missing Dodo ID)."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
         status_data = dodo_client.get_payment_status(payment.dodo_payment_id)
-        
-        # Map Dodo status to our status
-        dodo_status = status_data.get('status', '').lower()
-        
+
+        if status_data is None:
+            logger.error(f"Received None status_data for Dodo payment ID {payment.dodo_payment_id}")
+            # Return current status, indicating check failed
+            return Response({
+                'payment_id': payment.id,
+                'status': payment.status, # Keep current status
+                'message': 'Could not retrieve status from payment provider.'
+            })
+
+        # Get the status value from Dodo response
+        dodo_status_value = status_data.get('status') # Get the value, which might be None
+
+        # **** Handle the None case explicitly ****
+        if dodo_status_value is None:
+            logger.info(f"Dodo payment {payment.dodo_payment_id} reported status as null. Assuming pending/processing.")
+            # Treat null status as still processing
+            return Response({
+                'payment_id': payment.id,
+                'status': 'processing', # Or keep payment.status if preferred
+                'message': 'Payment status is currently initializing.'
+            })
+
+        # If not None, convert to lower case for comparison
+        dodo_status = dodo_status_value.lower() # Now safe to call .lower()
+
         if dodo_status == 'succeeded':
-            # Payment successful - update status and add credits
-            payment.status = 'completed'
-            payment.save()
-            
-            # Add credits to user's account
-            profile = request.user.profile
-            profile.credit_balance += payment.credits_purchased
-            profile.save()
-            
-            # Clear cache
-            cache.delete(f'user_profile_{request.user.id}')
-            
+            if payment.status != 'completed':
+                payment.status = 'completed'
+                payment.save()
+
+                profile = request.user.profile
+                profile.credit_balance += payment.credits_purchased
+                profile.save()
+                cache.delete(f'user_profile_{request.user.id}')
+                logger.info(f"Payment {payment.id} completed via status check. Added {payment.credits_purchased} credits to user {request.user.id}. New balance: {profile.credit_balance}")
+
             return Response({
                 'payment_id': payment.id,
                 'status': 'completed',
                 'credits_purchased': payment.credits_purchased,
-                'credit_balance': profile.credit_balance
+                'credit_balance': request.user.profile.credit_balance # Return updated balance
             })
-            
+
         elif dodo_status == 'failed':
-            payment.status = 'failed'
-            payment.save()
-            
+            if payment.status != 'failed':
+                payment.status = 'failed'
+                payment.save()
+                logger.info(f"Payment {payment.id} failed via status check.")
             return Response({
                 'payment_id': payment.id,
                 'status': 'failed',
                 'message': 'Payment was unsuccessful'
             })
-            
+
         elif dodo_status == 'cancelled':
-            payment.status = 'cancelled'
-            payment.save()
-            
+            if payment.status != 'cancelled':
+                payment.status = 'cancelled'
+                payment.save()
+                logger.info(f"Payment {payment.id} cancelled via status check.")
             return Response({
                 'payment_id': payment.id,
                 'status': 'cancelled',
                 'message': 'Payment was cancelled'
             })
-            
-        else:
-            # Still processing
+
+        else: # Still processing or other unknown status
+            logger.info(f"Dodo payment {payment.dodo_payment_id} status: {dodo_status}. Treating as processing.")
+            # Optionally update payment.status to 'processing' if it was 'pending'
+            # if payment.status == 'pending':
+            #    payment.status = 'processing'
+            #    payment.save()
             return Response({
                 'payment_id': payment.id,
-                'status': 'processing',
-                'message': 'Payment is still being processed'
+                'status': 'processing', # Return consistent processing status
+                'message': f'Payment status from provider: {dodo_status}'
             })
             
     except Exception as e:
-        logger.error(f"Error checking payment status: {str(e)}")
+        logger.exception(f"Error checking payment status for payment {payment.id} (Dodo ID: {payment.dodo_payment_id}): {str(e)}")
         return Response(
-            {"error": "Failed to check payment status"},
+            {"error": "Failed to check payment status due to an internal error."},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
 
@@ -215,7 +248,7 @@ def webhook_handler(request):
                     payment.status = 'completed'
                     payment.save()
                     
-                    # Add credits to user
+                    # Add credits to user's account
                     user = payment.user
                     profile = user.profile
                     profile.credit_balance += payment.credits_purchased
