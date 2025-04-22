@@ -12,6 +12,7 @@ class PricingPlan(models.Model):
     dodo_product_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    region = models.CharField(max_length=10, choices=[('IN', 'India'), ('GLOBAL', 'Global')], default='IN')
 
     def __str__(self):
         return f"{self.name} - {self.credits} credits for ₹{self.price_inr}"

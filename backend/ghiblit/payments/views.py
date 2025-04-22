@@ -17,14 +17,24 @@ from .models import Payment, PricingPlan, WebhookEvent
 from .serializers import PaymentSerializer, PricingPlanSerializer
 from users.models import UserProfile
 from .dodo import DodoPaymentsClient, generate_order_id
+from .utils import get_user_region
 
 logger = logging.getLogger(__name__)
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_pricing_plans(request):
-    """Get active pricing plans"""
-    plans = PricingPlan.objects.filter(is_active=True)
+    """Get active pricing plans based on user's region"""
+    # Get user region based on IP
+    region = get_user_region(request)
+    
+    # Filter plans by region and active status
+    plans = PricingPlan.objects.filter(is_active=True, region=region)
+    
+    # If no plans found for the region, fall back to global plans
+    if not plans.exists():
+        plans = PricingPlan.objects.filter(is_active=True, region='GLOBAL')
+    
     serializer = PricingPlanSerializer(plans, many=True)
     return Response(serializer.data)
 
@@ -46,11 +56,19 @@ class CreatePaymentView(views.APIView):
         # Generate unique order ID
         order_id = generate_order_id()
         
+        # Determine amount and currency based on plan's region
+        if plan.region == 'GLOBAL':
+            amount = plan.price_usd
+            currency = 'USD'
+        else:
+            amount = plan.price_inr
+            currency = 'INR'
+
         # Create a payment record in our database
         payment = Payment.objects.create(
             user=request.user,
-            amount=plan.price_inr,
-            currency='INR',
+            amount=amount,
+            currency=currency,
             credits_purchased=plan.credits,
             status='pending',
             order_id=order_id

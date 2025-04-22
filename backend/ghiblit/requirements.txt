@@ -67,3 +67,4 @@ pytesseract
 gunicorn==21.2.0
 whitenoise==6.5.0
 standardwebhooks
+geoip2==4.7.0

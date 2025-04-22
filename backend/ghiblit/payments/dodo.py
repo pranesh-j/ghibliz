@@ -23,77 +23,71 @@ class DodoPaymentsClient:
         # Prepare the API request payload
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json" # [cite: 132]
+            "Content-Type": "application/json"
         }
 
         # Create customer data
-        customer_name = f"{user.first_name} {user.last_name}".strip() or user.username # [cite: 132]
-        # Ensure the amount meets the minimum requirement for the payload
-        payload_amount = max(50, int(pricing_plan.price_inr))
+        customer_name = f"{user.first_name} {user.last_name}".strip() or user.username
+        
+        # Determine amount and currency based on plan's region
+        if pricing_plan.region == 'GLOBAL':
+            payload_amount = max(1, int(pricing_plan.price_usd))
+            currency = 'USD'
+        else:
+            payload_amount = max(50, int(pricing_plan.price_inr))
+            currency = 'INR'
 
         # --- Get the actual product ID from Dodo (stored in your model) ---
         dodo_product_identifier = pricing_plan.dodo_product_id
         if not dodo_product_identifier:
-             # Log a warning or raise an error if the ID is missing, as it's required now
-             logger.error(f"PricingPlan ID {pricing_plan.id} ({pricing_plan.name}) is missing the required dodo_product_id.")
-             # Depending on your requirements, you might want to raise an exception
-             # raise ValueError(f"Missing dodo_product_id for plan {pricing_plan.id}")
-             # Or fallback (less ideal, as it might cause the 404 again)
-             # dodo_product_identifier = f"credits_{pricing_plan.id}"
-             # For now, let's explicitly return an error state or raise exception
-             raise ValueError(f"Configuration error: Dodo Product ID not set for plan '{pricing_plan.name}' (ID: {pricing_plan.id})")
-
+            logger.error(f"PricingPlan ID {pricing_plan.id} ({pricing_plan.name}) is missing the required dodo_product_id.")
+            raise ValueError(f"Configuration error: Dodo Product ID not set for plan '{pricing_plan.name}' (ID: {pricing_plan.id})")
 
         # Create the payload according to Dodo API requirements
         payload = {
-            "payment_link": True, # [cite: 132]
+            "payment_link": True,
             "customer": {
-                "email": user.email, # [cite: 133]
-                "name": customer_name, # [cite: 133]
-                "create_new_customer": True # [cite: 133]
+                "email": user.email,
+                "name": customer_name,
+                "create_new_customer": True
             },
-            "billing": { # Example billing, adjust if needed
-                "country": "US", # [cite: 133]
-                "city": "City", # [cite: 134]
-                "state": "State", # [cite: 134]
-                "street": "Street", # [cite: 134]
-                "zipcode": "00000" # [cite: 134]
+            "billing": {
+                "country": "US",
+                "city": "City",
+                "state": "State",
+                "street": "Street",
+                "zipcode": "00000"
             },
             "product_cart": [
-                 {
-                    "amount": payload_amount, # Use the calculated amount >= 50
-                    "product_id": dodo_product_identifier, # Use the ID from the DB
+                {
+                    "amount": payload_amount,
+                    "currency": currency,
+                    "product_id": dodo_product_identifier,
                     "quantity": 1
                 }
             ],
             "metadata": {
-                "credits": str(pricing_plan.credits), # [cite: 136]
-                "plan_name": pricing_plan.name, # [cite: 136]
-                "user_id": str(user.id) # [cite: 136]
+                "credits": str(pricing_plan.credits),
+                "plan_name": pricing_plan.name,
+                "user_id": str(user.id)
             },
-            "return_url": settings.DODO_SUCCESS_URL # [cite: 136]
+            "return_url": settings.DODO_SUCCESS_URL
         }
 
         try:
             response = requests.post(
-                f"{self.base_url}/payments", # [cite: 137]
+                f"{self.base_url}/payments",
                 headers=headers,
                 json=payload
             )
-            # For debugging [cite: 138]
-            print(f"Dodo API request: {self.base_url}/payments")
-            print(f"Payload: {json.dumps(payload)}")
-            print(f"Response status: {response.status_code}")
-            print(f"Response body: {response.text}")
-
-            response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
+            response.raise_for_status()
             return response.json()
 
-        except requests.exceptions.RequestException as e: # [cite: 139]
-            logger.error(f"Dodo payment creation failed: {str(e)}") # [cite: 139]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Dodo payment creation failed: {str(e)}")
             if hasattr(e, 'response') and e.response:
-                logger.error(f"Response: {e.response.text}") # [cite: 139]
-            raise # Re-raise the exception to be handled by the calling view
+                logger.error(f"Response: {e.response.text}")
+            raise
 
     def get_payment_status(self, payment_id):
         """
