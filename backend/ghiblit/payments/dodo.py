@@ -31,11 +31,18 @@ class DodoPaymentsClient:
         
         # Determine amount and currency based on plan's region
         if pricing_plan.region == 'GLOBAL':
-            payload_amount = max(1, int(pricing_plan.price_usd))
+            # Convert dollars to cents (integer)
+            payload_amount = int(pricing_plan.price_usd * 100) 
             currency = 'USD'
-        else:
-            payload_amount = max(50, int(pricing_plan.price_inr))
+        else: # India
+            # Assuming Dodo expects whole Rupees for INR based on your previous success
+            payload_amount = max(50, int(pricing_plan.price_inr)) 
+            # If Dodo actually expects *paisa* for INR, you'd use:
+            # payload_amount = int(pricing_plan.price_inr * 100) 
             currency = 'INR'
+
+        # Ensure minimum amount if necessary AFTER conversion (e.g., minimum 1 cent)
+        payload_amount = max(1, payload_amount) 
 
         # --- Get the actual product ID from Dodo (stored in your model) ---
         dodo_product_identifier = pricing_plan.dodo_product_id
