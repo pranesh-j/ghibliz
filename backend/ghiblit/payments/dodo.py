@@ -1,5 +1,3 @@
-# backend/ghiblit/payments/dodo.py
-
 import requests
 import logging
 import hmac
@@ -8,49 +6,62 @@ import json
 import uuid
 from django.conf import settings
 from standardwebhooks import Webhook
+from .utils import get_user_country
+
 logger = logging.getLogger(__name__)
 
 class DodoPaymentsClient:
     """Client for Dodo Payments API integration"""
 
     def __init__(self):
-        # The base URL without version path (as per documentation) [cite: 131]
-        self.base_url = "https://test.dodopayments.com" if settings.DODO_TEST_MODE else "https://live.dodopayments.com" # [cite: 131]
-        self.api_key = settings.DODO_API_KEY # [cite: 131]
-        self.webhook_secret = settings.DODO_WEBHOOK_SECRET # [cite: 131]
+        """Initialize Dodo Payments client with appropriate base URL and credentials"""
+        self.base_url = "https://test.dodopayments.com" if settings.DODO_TEST_MODE else "https://live.dodopayments.com"
+        self.api_key = settings.DODO_API_KEY
+        self.webhook_secret = settings.DODO_WEBHOOK_SECRET
 
-    def create_payment(self, pricing_plan, user):
-        # Prepare the API request payload
+    def create_payment(self, request, pricing_plan, user):
+        """
+        Create a payment link for a user and pricing plan.
+        
+        Args:
+            request: The HTTP request object (used for country detection)
+            pricing_plan: The PricingPlan instance
+            user: The User instance making the payment
+            
+        Returns:
+            dict: Payment data including payment_id and payment_link
+            
+        Raises:
+            ValueError: If Dodo product ID is missing
+            requests.exceptions.RequestException: If API call fails
+        """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
 
-        # Create customer data
         customer_name = f"{user.first_name} {user.last_name}".strip() or user.username
-        
-        # Determine amount and currency based on plan's region
+
         if pricing_plan.region == 'GLOBAL':
-            # Convert dollars to cents (integer)
-            payload_amount = int(pricing_plan.price_usd * 100) 
+            payload_amount = int(pricing_plan.price_usd * 100)
             currency = 'USD'
         else: # India
-            # Assuming Dodo expects whole Rupees for INR based on your previous success
-            payload_amount = max(50, int(pricing_plan.price_inr)) 
-            # If Dodo actually expects *paisa* for INR, you'd use:
-            # payload_amount = int(pricing_plan.price_inr * 100) 
+            payload_amount = max(50, int(pricing_plan.price_inr))
             currency = 'INR'
 
-        # Ensure minimum amount if necessary AFTER conversion (e.g., minimum 1 cent)
-        payload_amount = max(1, payload_amount) 
+        payload_amount = max(1, payload_amount)
 
-        # --- Get the actual product ID from Dodo (stored in your model) ---
+        user_country_code = get_user_country(request)
+        default_country = 'IN' if pricing_plan.region == 'IN' else 'US'
+        billing_country = user_country_code if user_country_code else default_country
+        logger.info(f"Determined billing country for payment creation: {billing_country} "
+                    f"(Detected: {user_country_code}, Fallback used: {not user_country_code})")
+
         dodo_product_identifier = pricing_plan.dodo_product_id
         if not dodo_product_identifier:
             logger.error(f"PricingPlan ID {pricing_plan.id} ({pricing_plan.name}) is missing the required dodo_product_id.")
             raise ValueError(f"Configuration error: Dodo Product ID not set for plan '{pricing_plan.name}' (ID: {pricing_plan.id})")
 
-        # Create the payload according to Dodo API requirements
         payload = {
             "payment_link": True,
             "customer": {
@@ -59,7 +70,7 @@ class DodoPaymentsClient:
                 "create_new_customer": True
             },
             "billing": {
-                "country": "US",
+                "country": billing_country,
                 "city": "City",
                 "state": "State",
                 "street": "Street",
@@ -87,13 +98,16 @@ class DodoPaymentsClient:
                 headers=headers,
                 json=payload
             )
+            logger.info(f"Dodo create_payment response status: {response.status_code}")
+            if response.status_code != 200:
+                logger.warning(f"Dodo create_payment response text: {response.text}")
             response.raise_for_status()
             return response.json()
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Dodo payment creation failed: {str(e)}")
             if hasattr(e, 'response') and e.response:
-                logger.error(f"Response: {e.response.text}")
+                logger.error(f"Response status: {e.response.status_code}, Response text: {e.response.text}")
             raise
 
     def get_payment_status(self, payment_id):
@@ -119,63 +133,55 @@ class DodoPaymentsClient:
                 f"{self.base_url}/payments/{payment_id}",
                 headers=headers
             )
-            # Log raw response before raising status or parsing JSON
             logger.info(f"Dodo get_payment_status raw response for {payment_id} - Status: {response.status_code}, Body: {response.text}")
 
-            response.raise_for_status()  # Check for HTTP errors first
+            response.raise_for_status()
             return response.json()
         except requests.exceptions.JSONDecodeError as json_err:
             logger.error(f"Failed to decode JSON from Dodo status response for {payment_id}: {str(json_err)}. Body was: {response.text}")
-            # Decide how to handle - maybe return None or raise a specific error
-            return None  # Or raise custom error
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to check Dodo payment status for {payment_id}: {str(e)}")
             if hasattr(e, 'response') and e.response:
                 logger.error(f"Response: {e.response.text}")
-            # Decide how to handle - return None or raise
-            return None  # Or raise e
-        except Exception as ex:  # Catch any other unexpected errors
+            return None
+        except Exception as ex:
             logger.exception(f"Unexpected error checking Dodo payment status for {payment_id}: {str(ex)}")
-            # Decide how to handle - return None or raise
-            return None  # Or raise ex
+            return None
 
     def verify_webhook_signature(self, payload, signature, webhook_id, timestamp):
         """
-        Verify webhook signature from Dodo Payments [cite: 143]
+        Verify webhook signature from Dodo Payments
 
         Args:
-            payload: The raw request body [cite: 143]
-            signature: The webhook-signature header value [cite: 143]
-            webhook_id: The webhook-id header value [cite: 143]
-            timestamp: The webhook-timestamp header value [cite: 143]
+            payload: The raw request body
+            signature: The webhook-signature header value
+            webhook_id: The webhook-id header value
+            timestamp: The webhook-timestamp header value
 
         Returns:
-            bool: True if signature is valid [cite: 144]
+            bool: True if signature is valid
         """
-        if not signature or not webhook_id or not timestamp: # [cite: 144]
+        if not signature or not webhook_id or not timestamp:
             logger.warning("Webhook verification failed: Missing required headers.")
             return False
 
-        # Signature verification using Standard Webhooks approach [cite: 145]
         try:
-            # Ensure standardwebhooks library is installed and imported
-            webhook = Webhook(self.webhook_secret) # [cite: 145]
+            webhook = Webhook(self.webhook_secret)
 
             headers = {
-                "webhook-id": webhook_id, # [cite: 145]
-                "webhook-signature": signature, # [cite: 145]
-                "webhook-timestamp": timestamp # [cite: 146]
+                "webhook-id": webhook_id,
+                "webhook-signature": signature,
+                "webhook-timestamp": timestamp
             }
 
-            # Verify will raise an exception if invalid [cite: 146]
             webhook.verify(payload, headers)
             logger.info(f"Webhook signature verified successfully for ID: {webhook_id}")
             return True
-        except Exception as e: # Catches verification errors from standardwebhooks
-            logger.error(f"Webhook signature verification failed for ID {webhook_id}: {str(e)}") # [cite: 147]
+        except Exception as e:
+            logger.error(f"Webhook signature verification failed for ID {webhook_id}: {str(e)}")
             return False
-
 
 def generate_order_id():
     """Generate a unique order ID for reference"""
-    return f"GHB-{uuid.uuid4().hex[:8].upper()}" # [cite: 147]
+    return f"GHB-{uuid.uuid4().hex[:8].upper()}"

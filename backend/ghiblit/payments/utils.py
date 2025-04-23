@@ -1,5 +1,3 @@
-# backend/ghiblit/payments/utils.py
-
 from django.contrib.gis.geoip2 import GeoIP2
 from django.conf import settings
 import os
@@ -17,15 +15,12 @@ def get_user_country(request):
         else:
             ip = request.META.get('REMOTE_ADDR')
         
-        # Use Django's GeoIP2 for lookup
         g = GeoIP2()
         country = g.country(ip)
         
         return country['country_code']
     except Exception as e:
-        # Log the error
         print(f"GeoIP lookup error: {e}")
-        # Default to global if detection fails
         return None
 
 def get_user_region(request):

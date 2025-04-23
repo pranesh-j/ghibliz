@@ -13,9 +13,6 @@ class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     
     def post(self, request):
-        # Add debug print for troubleshooting
-        print("Registration data received:", request.data)
-        
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
@@ -25,9 +22,6 @@ class RegisterView(generics.CreateAPIView):
                 "refresh": str(refresh),
                 "access": str(refresh.access_token),
             }, status=status.HTTP_201_CREATED)
-        
-        # Add debug print for validation errors
-        print("Validation errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -37,17 +31,14 @@ class UserProfileView(generics.RetrieveAPIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_object(self):
-        # Try to get cached profile first
         cache_key = f'user_profile_{self.request.user.id}'
         cached_profile = cache.get(cache_key)
         
         if cached_profile:
             return cached_profile
         
-        # If not in cache, get from database
         user = self.request.user
         
-        # Cache for 10 minutes - we don't want to cache too long as credit balance might change
         cache.set(cache_key, user, 60 * 10)
         
         return user

@@ -5,17 +5,14 @@ class Command(BaseCommand):
     help = 'Creates default pricing plans for the application'
 
     def handle(self, *args, **options):
-        # Delete existing plans if requested
         if options.get('delete_existing'):
             PricingPlan.objects.all().delete()
             self.stdout.write(self.style.SUCCESS('Deleted existing pricing plans'))
         
-        # Check if plans already exist
         if PricingPlan.objects.exists() and not options.get('delete_existing'):
             self.stdout.write(self.style.WARNING('Pricing plans already exist. Use --delete-existing to replace them.'))
             return
 
-        # Create the required plans
         PricingPlan.objects.create(
             name="Basic",
             credits=3,
