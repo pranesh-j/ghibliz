@@ -192,7 +192,7 @@ function HomeContent() {
          console.log("Not showing promo popup. Balance:", updatedBalance);
       }
 
-      toast({ title: "Transformation complete!", description: "Your image has been Ghiblified.", variant: "success" })
+      toast({ title: "Transformation complete!", description: "Your image has been Transformed.", variant: "success" })
 
     } catch (error: any) {
       console.error("Image processing error:", error)
@@ -261,13 +261,13 @@ function HomeContent() {
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `ghiblified-${imageData.id || Date.now()}.jpg`;
+        link.download = `Transformed-${imageData.id || Date.now()}.jpg`;
         document.body.appendChild(link);
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
         
-        toast({ title: "Download started", description: "Your Ghiblified image is downloading.", variant: "success" });
+        toast({ title: "Download started", description: "Your Artistic image is downloading.", variant: "success" });
         return;
       }
       
@@ -292,13 +292,13 @@ function HomeContent() {
           const url = window.URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `ghiblified-${imageData.id || Date.now()}.jpg`;
+          link.download = `Transformed-${imageData.id || Date.now()}.jpg`;
           document.body.appendChild(link);
           link.click();
           link.remove();
           window.URL.revokeObjectURL(url);
           
-          toast({ title: "Download started", description: "Your Ghiblified image is downloading.", variant: "success" });
+          toast({ title: "Download started", description: "Your Artistic image is downloading.", variant: "success" });
           return;
         }
       }
@@ -307,12 +307,12 @@ function HomeContent() {
       console.log("Using direct URL download as fallback");
       const link = document.createElement('a');
       link.href = imageUrl;
-      link.download = `ghiblified-${imageData.id || Date.now()}.jpg`;
+      link.download = `Transformed-${imageData.id || Date.now()}.jpg`;
       document.body.appendChild(link);
       link.click();
       link.remove();
       
-      toast({ title: "Download started", description: "Your Ghiblified image is downloading.", variant: "success" });
+      toast({ title: "Download started", description: "Your Transformed image is downloading.", variant: "success" });
       
     } catch (error) {
       console.error("Download error:", error);
@@ -323,7 +323,7 @@ function HomeContent() {
           console.log("Falling back to data URL download");
           const link = document.createElement('a');
           link.href = processedImage;
-          link.download = `ghiblified-preview-${Date.now()}.jpg`;
+          link.download = `Art-preview-${Date.now()}.jpg`;
           document.body.appendChild(link);
           link.click();
           link.remove();
@@ -348,7 +348,7 @@ function HomeContent() {
     const shareUrl = imageData.preview_url || window.location.href;
     try {
       if (navigator.share) {
-        await navigator.share({ title: 'Ghiblified Image!', text: 'Check out this image I transformed using Ghiblit.art!', url: shareUrl });
+        await navigator.share({ title: 'Image Art!', text: 'Check out this image I transformed using Ghiblit.art!', url: shareUrl });
         toast({ title: "Shared!", description: "Image shared successfully.", variant: "success" });
       } else {
         navigator.clipboard.writeText(shareUrl);
@@ -517,7 +517,7 @@ function HomeContent() {
                       <img
                         key={viewingImage === "original" ? selectedImage : processedImage}
                         src={viewingImage === "original" ? selectedImage : processedImage || ""}
-                        alt={viewingImage === "original" ? "Original Upload" : "Ghiblified Result"}
+                        alt={viewingImage === "original" ? "Original Upload" : "Transformed Result"}
                         className="w-auto max-h-[70vh] object-contain" 
                         onLoad={handleImageLoad}
                         onError={(e) => { e.currentTarget.alt = "Image failed to load"; }}
@@ -557,7 +557,7 @@ function HomeContent() {
                       </div>
 
                       <div>
-                        <p className="text-xs sm:text-sm font-medium text-ghibli-dark mb-1 sm:mb-2 text-center">Ghiblified</p>
+                        <p className="text-xs sm:text-sm font-medium text-ghibli-dark mb-1 sm:mb-2 text-center">Transformed</p>
                         <div
                           className={`rounded-lg overflow-hidden bg-gray-100 aspect-[4/3] border-2 border-amber-100 ${processedImage ? 'hover:border-amber-200 cursor-pointer group relative' : ''}`}
                           onClick={() => processedImage && handleViewImage("processed")}
@@ -570,7 +570,7 @@ function HomeContent() {
                               </div>
                             </div>
                           ) : processedImage ? (
-                            <img src={processedImage} alt="Ghiblified Result" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.alt = "Preview failed to load"; }}/>
+                            <img src={processedImage} alt="Transformed Result" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.alt = "Preview failed to load"; }}/>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center bg-gray-100">
                               <p className="text-xs text-center text-gray-500 px-2">Upload an image to see the result</p>
