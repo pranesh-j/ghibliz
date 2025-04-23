@@ -116,7 +116,6 @@ html {
   scrollbar-color: rgba(245, 158, 11, 0.5) rgba(176, 224, 230, 0.3); /* thumb and track color */
 }
 
-/* Make sure the main container allows scrolling but hides horizontal overflow */
 html, body {
   overflow-x: hidden;
   overflow-y: auto;
