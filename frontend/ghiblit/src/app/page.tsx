@@ -132,8 +132,9 @@ function HomeContent() {
      if (user && user.profile.credit_balance <= 0) {
        toast({
          title: "No Credits",
-         description: "You need credits to transform images. Please buy a package.",
+         description: "Why pay $20 to ChatGPT when you can do the same for less than $2, checkout the pricing",
          variant: "warning",
+         duration: 10000,
          action: ( <Button variant="secondary" size="sm" onClick={handleBuyCredits}> Buy Credits </Button> ),
        })
        if (fileInputRef.current) fileInputRef.current.value = ""
@@ -700,8 +701,8 @@ function HomeContent() {
           >
             <button onClick={() => setShowPromoPopup(false)} className="absolute top-1 right-1 text-gray-400 hover:text-gray-700 p-1 rounded-full" aria-label="Close promotion"> <X size={16} /> </button>
 
-            <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT 20$ when you can do it for 1$?</p>
-            <p className="text-xs text-ghibli-dark/70 mb-3">Get 10 transforms for just $1!</p>
+            <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT 20$ when you can do it for 2$?</p>
+            <p className="text-xs text-ghibli-dark/70 mb-3">Get 3 image transformations for just $2!</p>
 
             <button
               onClick={handleBuyCredits}
