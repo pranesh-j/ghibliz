@@ -60,3 +60,18 @@ class GeneratedImage(models.Model):
         
         # Return properly formatted URL
         return f"https://{project_id}.supabase.co/storage/v1/object/public/ghiblits/{path}"
+
+
+class StylePrompt(models.Model):
+    style_key = models.CharField(max_length=50, unique=True)
+    prompt = models.TextField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Style: {self.style_key}"
+        
+    class Meta:
+        verbose_name = 'Style Prompt'
+        verbose_name_plural = 'Style Prompts'

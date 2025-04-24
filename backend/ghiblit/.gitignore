@@ -62,3 +62,6 @@ ENV/
 
 # OS specific
 .DS_Store
+
+load_style_prompts.py
+images/management/commands/load_style_prompts.py

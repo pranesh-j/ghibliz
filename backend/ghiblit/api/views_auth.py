@@ -90,10 +90,10 @@ class GoogleLoginView(APIView):
             profile_created = created
 
             if profile_created:
-                profile.credit_balance = 1
+                # profile.credit_balance = 1
                 profile.free_transform_used = False
                 profile.save()
-                logger.info(f"Granted 1 initial credit to new user {email}")
+                # logger.info(f"Granted 1 initial credit to new user {email}")
                 cache.delete(f'user_profile_{user.id}')
 
             cache.delete(f'user_profile_{user.id}')
