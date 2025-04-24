@@ -1,5 +1,3 @@
-// frontend/ghiblit/src/services/paymentService.ts
-
 import api from './api';
 
 interface PricingPlan {
@@ -7,6 +5,9 @@ interface PricingPlan {
     name: string;
     credits: number;
     price_inr: number;
+    price_usd: number; 
+    region: string;
+    display_price?: string; 
     is_active: boolean;
 }
 

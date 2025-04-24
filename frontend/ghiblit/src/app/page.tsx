@@ -71,38 +71,94 @@ function HomeContent() {
     }
   };
 
+  // Function to handle image loading errors in the gallery
+  const handleImageError = useCallback(async (index: number, rowType: 'upper' | 'lower') => {
+    console.log(`Image at index ${index} in ${rowType} row failed to load, attempting to fetch replacement`);
+    
+    try {
+      // Determine which array index we need to update in recentWorks
+      const actualIndex = rowType === 'upper' ? index % 6 : (index % 6) + 6;
+      
+      // Make a copy of the current recentWorks array
+      const updatedWorks = [...recentWorks];
+      
+      // Try to fetch a replacement image from the API
+      try {
+        // Request one more image than we have
+        const newImages = await ImageService.getRecentImages(13);
+        
+        // Find images that aren't already in our gallery
+        const existingIds = new Set(recentWorks.map(img => img.id));
+        const newImage = newImages.find(img => !existingIds.has(img.id));
+        
+        if (newImage) {
+          console.log(`Found replacement image with id ${newImage.id} for position ${actualIndex}`);
+          updatedWorks[actualIndex] = newImage;
+          setRecentWorks(updatedWorks);
+          return;
+        }
+      } catch (error) {
+        console.error("Failed to fetch replacement image:", error);
+      }
+      
+      // If we couldn't get a new image, make sure we at least have a placeholder
+      updatedWorks[actualIndex] = {
+        ...updatedWorks[actualIndex],
+        original: "/api/placeholder/400/300",
+        processed: "/api/placeholder/400/300"
+      };
+      
+      setRecentWorks(updatedWorks);
+    } catch (err) {
+      console.error("Error in handleImageError:", err);
+    }
+  }, [recentWorks]);
 
+  // Fetch initial gallery images
   useEffect(() => {
     const fetchRecentWorks = async () => {
-      setLoadingRecentWorks(true)
+      setLoadingRecentWorks(true);
       try {
-        const data = await ImageService.getRecentImages(6)
-        const validData = data.filter(item =>
-          (item.original && typeof item.original === 'string' && !item.original.includes('undefined')) ||
-          (item.processed && typeof item.processed === 'string' && !item.processed.includes('undefined'))
-        )
-        setRecentWorks(validData.length > 0 ? validData : data)
+        const data = await ImageService.getRecentImages(12);
+        
+        if (data.length > 0) {
+          setRecentWorks(data);
+        } else {
+          // Fallback if no images
+          setRecentWorks(Array(12).fill(null).map((_, index) => ({ 
+            id: index + 1, 
+            original: "/api/placeholder/400/300", 
+            processed: "/api/placeholder/400/300" 
+          })));
+        }
       } catch (error) {
-        console.error("Failed to fetch recent works:", error)
+        console.error("Failed to fetch recent works:", error);
         toast({
           title: "Couldn't load gallery",
           description: "We couldn't load recent creations. Please try again later.",
           variant: "error"
-        })
-        setRecentWorks([
-          { id: 1, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-          { id: 2, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-          { id: 3, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-          { id: 4, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-          { id: 5, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-          { id: 6, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
-        ])
+        });
+        // Fallback placeholders
+        setRecentWorks(Array(12).fill(null).map((_, index) => ({ 
+          id: index + 1, 
+          original: "/api/placeholder/400/300", 
+          processed: "/api/placeholder/400/300" 
+        })));
       } finally {
-        setLoadingRecentWorks(false)
+        setLoadingRecentWorks(false);
       }
-    }
-    fetchRecentWorks()
-  }, [toast])
+    };
+    
+    fetchRecentWorks();
+    
+    // Set up refresh every 6 hours
+    const refreshInterval = setInterval(() => {
+      console.log("Refreshing gallery images");
+      fetchRecentWorks();
+    }, 6 * 60 * 60 * 1000); // 6 hours
+    
+    return () => clearInterval(refreshInterval);
+  }, [toast]);
 
   const handleStyleChange = useCallback((style: string) => {
     setSelectedStyle(style);
@@ -619,78 +675,98 @@ function HomeContent() {
         <section className="py-4 sm:py-6 px-3 sm:px-8 bg-amber-50/70">
           <div className="max-w-7xl mx-auto">
             <h2 className="text-xl sm:text-2xl font-playfair text-ghibli-dark text-center mb-3 sm:mb-5">Recent Creations</h2>
-              {loadingRecentWorks ? (
-                <div className="flex justify-center items-center py-20"> <Loader2 className="w-8 h-8 text-ghibli-dark animate-spin" /> </div>
-              ) : (
-                <>
-                  <div className="relative w-full overflow-hidden mb-3 sm:mb-4">
-                    <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
-                    <motion.div 
-                      className="flex gap-3 sm:gap-4"
-                      initial={{ x: 0 }}
-                      animate={{ x: "-50%" }}
-                      transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
-                      style={{ 
-                        width: "200%", 
-                        willChange: "transform",
-                        backfaceVisibility: "hidden",
-                        transform: "translateZ(0)"
-                      }}
-                    >
-                      {[...recentWorks, ...recentWorks].map((item, index) => (
-                        <div 
-                          key={`top-${item.id}-${index}`} 
-                          className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
-                          style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
-                        >
-                          <div className="aspect-[4/3] relative">
-                            <img 
-                              src={item.original || "/api/placeholder/400/300"} 
-                              alt={`Original ${item.id}`} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"} 
-                            />
-                          </div>
+            
+            {loadingRecentWorks ? (
+              <div className="flex justify-center items-center py-20">
+                <Loader2 className="w-8 h-8 text-ghibli-dark animate-spin" />
+              </div>
+            ) : (
+              <>
+                {/* First Row - Original Images */}
+                <div className="relative w-full overflow-hidden mb-3 sm:mb-4">
+                  <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
+                  <motion.div 
+                    className="flex gap-3 sm:gap-4"
+                    initial={{ x: 0 }}
+                    animate={{ x: "-50%" }}
+                    transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+                    style={{ 
+                      width: "200%", 
+                      willChange: "transform",
+                      backfaceVisibility: "hidden",
+                      transform: "translateZ(0)"
+                    }}
+                  >
+                    {/* First 6 images + duplicates for continuous scrolling */}
+                    {[...recentWorks.slice(0, 6), ...recentWorks.slice(0, 6)].map((item, index) => (
+                      <div 
+                        key={`top-${item.id}-${index}`} 
+                        className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
+                        style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
+                      >
+                        <div className="aspect-[4/3] relative">
+                          <img 
+                            src={item.original || "/api/placeholder/400/300"} 
+                            alt={`Original ${item.id}`} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Set placeholder immediately
+                              e.currentTarget.src = "/api/placeholder/400/300";
+                              // Try to fetch a replacement
+                              handleImageError(index, 'upper');
+                            }}
+                            loading="lazy"
+                          />
                         </div>
-                      ))}
-                    </motion.div>
-                    <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
-                  </div>
-                  <div className="relative w-full overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
-                    <motion.div 
-                      className="flex gap-3 sm:gap-4"
-                      initial={{ x: "-50%" }}
-                      animate={{ x: "0%" }}
-                      transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
-                      style={{ 
-                        width: "200%", 
-                        willChange: "transform",
-                        backfaceVisibility: "hidden",
-                        transform: "translateZ(0)"
-                      }}
-                    >
-                      {[...recentWorks, ...recentWorks].map((item, index) => (
-                        <div 
-                          key={`bottom-${item.id}-${index}`} 
-                          className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
-                          style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
-                        >
-                          <div className="aspect-[4/3] relative">
-                            <img 
-                              src={item.processed || "/api/placeholder/400/300"} 
-                              alt={`Processed ${item.id}`} 
-                              className="w-full h-full object-cover"
-                              onError={(e) => e.currentTarget.src = "/api/placeholder/400/300"}
-                            />
-                          </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                  <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
+                </div>
+                
+                {/* Second Row - Processed Images */}
+                <div className="relative w-full overflow-hidden">
+                  <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
+                  <motion.div 
+                    className="flex gap-3 sm:gap-4"
+                    initial={{ x: "-50%" }}
+                    animate={{ x: "0%" }}
+                    transition={{ duration: 45, repeat: Infinity, ease: "linear", repeatType: "loop" }}
+                    style={{ 
+                      width: "200%", 
+                      willChange: "transform",
+                      backfaceVisibility: "hidden",
+                      transform: "translateZ(0)"
+                    }}
+                  >
+                    {/* Last 6 images + duplicates for continuous scrolling */}
+                    {[...recentWorks.slice(6, 12), ...recentWorks.slice(6, 12)].map((item, index) => (
+                      <div 
+                        key={`bottom-${item.id}-${index}`} 
+                        className="shrink-0 bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-all w-40 sm:w-60 border-2 border-transparent hover:border-ghibli-cream hover:scale-105 hover:z-10"
+                        style={{ transition: "transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease" }}
+                      >
+                        <div className="aspect-[4/3] relative">
+                          <img 
+                            src={item.processed || "/api/placeholder/400/300"} 
+                            alt={`Processed ${item.id}`} 
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Set placeholder immediately
+                              e.currentTarget.src = "/api/placeholder/400/300";
+                              // Try to fetch a replacement
+                              handleImageError(index, 'lower');
+                            }}
+                            loading="lazy"
+                          />
                         </div>
-                      ))}
-                    </motion.div>
-                    <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
-                  </div>
-                </>
-              )}
+                      </div>
+                    ))}
+                  </motion.div>
+                  <div className="absolute right-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-l from-amber-50/70 to-transparent pointer-events-none" />
+                </div>
+              </>
+            )}
           </div>
         </section>
 

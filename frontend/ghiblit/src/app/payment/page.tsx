@@ -15,7 +15,9 @@ interface PricingPlan {
   name: string;
   credits: number;
   price_inr: number;
-  price_usd?: number;
+  price_usd: number;
+  region: string;
+  display_price?: string;
   is_active: boolean;
 }
 
@@ -240,7 +242,7 @@ export default function PaymentPage() {
                       )}
                     </div>
                     <p className="text-3xl font-bold text-ghibli-dark mb-2">
-                       ₹{plan.price_inr}
+                      {plan.display_price || (plan.region === 'GLOBAL' ? `$${plan.price_usd}` : `₹${plan.price_inr}`)}
                     </p>
                     <p className="text-sm text-ghibli-dark/80">
                       {plan.credits} image transformation{plan.credits !== 1 ? 's' : ''}

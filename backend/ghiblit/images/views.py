@@ -10,7 +10,7 @@ import logging
 import requests
 import re
 from django.http import HttpResponse, Http404
-
+from django.core.files.storage import default_storage
 from .serializers import GeneratedImageSerializer, ImageUploadSerializer
 from .models import GeneratedImage
 from .services import transform_image_to_ghibli, create_watermarked_preview
@@ -146,29 +146,44 @@ class ImageTransformAPIView(views.APIView):
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-@cache_page(60 * 10)
+@cache_page(60 * 60 * 6)  # Cache for 6 hours
 def recent_images(request):
-    limit = int(request.query_params.get('limit', 6))
-
-    images = GeneratedImage.objects.filter(is_paid=True).order_by('-created_at')[:limit]
-
+    limit = int(request.query_params.get('limit', 12))
+    
+    buffer_limit = limit * 2
+    images = GeneratedImage.objects.filter(is_paid=True).order_by('-created_at')[:buffer_limit]
+    
     result = []
+    valid_count = 0
+    
     for img in images:
-        if img.preview_image:
-            preview_url = request.build_absolute_uri(f'/api/clean-image/{img.preview_image.name}')
-        else:
-            preview_url = "/api/placeholder/400/300"
+        if not img.preview_image or not default_storage.exists(img.preview_image.name):
+            continue
             
+        if valid_count >= limit:
+            break
+            
+        preview_url = request.build_absolute_uri(f'/api/clean-image/{img.preview_image.name}')
         original_placeholder = preview_url
-
+        
         result.append({
             'id': img.id,
             'original': original_placeholder,
             'processed': preview_url,
+            'created_at': img.created_at.isoformat()
         })
-
+        
+        valid_count += 1
+    
+    while len(result) < limit:
+        result.append({
+            'id': 9000 + len(result),
+            'original': "/api/placeholder/400/300",
+            'processed': "/api/placeholder/400/300",
+            'created_at': timezone.now().isoformat()
+        })
+    
     return Response(result)
-
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
