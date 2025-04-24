@@ -1,5 +1,3 @@
-# backend/ghiblit/payments/views.py
-
 from django.shortcuts import get_object_or_404
 from rest_framework import status, views, permissions
 from rest_framework.response import Response
@@ -24,16 +22,24 @@ logger = logging.getLogger(__name__)
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_pricing_plans(request):
-    """Get active pricing plans based on user's region"""
+    """Get active pricing plans based on user's region with intro offer handling"""
     region = get_user_region(request)
-    
-    plans = PricingPlan.objects.filter(is_active=True, region=region)
-    
-    if not plans.exists():
-        plans = PricingPlan.objects.filter(is_active=True, region='GLOBAL')
-    
-    serializer = PricingPlanSerializer(plans, many=True)
+    user_profile = request.user.profile 
+
+    plans_qs = PricingPlan.objects.filter(is_active=True, region=region)
+
+    if not plans_qs.exists() and region != 'GLOBAL':
+        plans_qs = PricingPlan.objects.filter(is_active=True, region='GLOBAL')
+
+    if user_profile.intro_offer_redeemed:
+        plans_qs = plans_qs.filter(is_intro_offer=False)
+
+    if not plans_qs.exists():
+        plans_qs = PricingPlan.objects.filter(is_active=True, region='GLOBAL', is_intro_offer=False)
+
+    serializer = PricingPlanSerializer(plans_qs, many=True)
     return Response(serializer.data)
+
 
 class CreatePaymentView(views.APIView):
     """Create a payment and get payment link from Dodo Payments"""
@@ -54,7 +60,8 @@ class CreatePaymentView(views.APIView):
             HTTP_500_INTERNAL_SERVER_ERROR: If payment creation fails
         """
         plan_id = request.data.get('plan_id')
-        
+        user_profile = request.user.profile
+
         try:
             plan = PricingPlan.objects.get(id=plan_id, is_active=True)
         except PricingPlan.DoesNotExist:
@@ -62,7 +69,13 @@ class CreatePaymentView(views.APIView):
                 {"error": "Invalid or inactive pricing plan"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
+        if plan.is_intro_offer and user_profile.intro_offer_redeemed:
+            return Response(
+                {"error": "You have already redeemed the introductory offer."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         order_id = generate_order_id()
         
         if plan.region == 'GLOBAL':
@@ -78,7 +91,8 @@ class CreatePaymentView(views.APIView):
             currency=currency,
             credits_purchased=plan.credits,
             status='pending',
-            order_id=order_id
+            order_id=order_id,
+            metadata={'plan_id': plan.id, 'is_intro': plan.is_intro_offer}
         )
         
         try:
@@ -145,6 +159,9 @@ def check_payment_status(request, payment_id):
 
                 profile = request.user.profile
                 profile.credit_balance += payment.credits_purchased
+                if payment.metadata.get('is_intro'):
+                    profile.intro_offer_redeemed = True
+                    logger.info(f"Marked introductory offer as redeemed for user {request.user.id}")
                 profile.save()
                 cache.delete(f'user_profile_{request.user.id}')
                 logger.info(f"Test mode: Added {payment.credits_purchased} credits to user {request.user.id}. New balance: {profile.credit_balance}")
@@ -186,6 +203,9 @@ def check_payment_status(request, payment_id):
 
                 profile = request.user.profile
                 profile.credit_balance += payment.credits_purchased
+                if payment.metadata.get('is_intro'):
+                    profile.intro_offer_redeemed = True
+                    logger.info(f"Marked introductory offer as redeemed for user {request.user.id}")
                 profile.save()
                 cache.delete(f'user_profile_{request.user.id}')
                 logger.info(f"Payment {payment.id} completed via status check. Added {payment.credits_purchased} credits to user {request.user.id}. New balance: {profile.credit_balance}")
@@ -286,8 +306,10 @@ def webhook_handler(request):
                     user = payment.user
                     profile = user.profile
                     profile.credit_balance += payment.credits_purchased
+                    if payment.metadata.get('is_intro'):
+                        profile.intro_offer_redeemed = True
+                        logger.info(f"Marked introductory offer as redeemed for user {user.id}")
                     profile.save()
-                    
                     cache.delete(f'user_profile_{user.id}')
                     
                     logger.info(f"Added {payment.credits_purchased} credits to user {user.username}")

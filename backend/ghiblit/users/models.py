@@ -7,6 +7,7 @@ from django.dispatch import receiver
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     free_transform_used = models.BooleanField(default=False)
+    intro_offer_redeemed = models.BooleanField(default=False)
     credit_balance = models.IntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -65,3 +65,5 @@ ENV/
 
 load_style_prompts.py
 images/management/commands/load_style_prompts.py
+images/management/commands/clear_user_cache.py
+clear_user_cache.py

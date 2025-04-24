@@ -15,6 +15,7 @@ interface PricingPlan {
   name: string;
   credits: number;
   price_inr: number;
+  price_usd?: number;
   is_active: boolean;
 }
 
@@ -22,26 +23,23 @@ export default function PaymentPage() {
   const { user, isAuthenticated, refreshUserProfile } = useAuth()
   const { toast } = useToast()
   const router = useRouter()
-  
+
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([])
   const [selectedPlan, setSelectedPlan] = useState<PricingPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [creatingPayment, setCreatingPayment] = useState(false)
-  
-  // Payment status checking
+
   const [currentPaymentId, setCurrentPaymentId] = useState<number | null>(null)
   const [checkingStatus, setCheckingStatus] = useState(false)
   const statusCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
-  
-  // Load pricing plans on component mount
+
   useEffect(() => {
     const fetchPricingPlans = async () => {
       try {
         setLoading(true)
-        const plans = await paymentService.getPricingPlans()
+        const plans: PricingPlan[] = await paymentService.getPricingPlans()
         setPricingPlans(plans)
-        
-        // Auto-select first plan
+
         if (plans.length > 0) {
           setSelectedPlan(plans[0])
         }
@@ -56,20 +54,18 @@ export default function PaymentPage() {
         setLoading(false)
       }
     }
-    
+
     fetchPricingPlans()
-    
-    // Clean up interval when component unmounts
+
     return () => {
       if (statusCheckIntervalRef.current) {
         clearInterval(statusCheckIntervalRef.current)
       }
     }
   }, [toast])
-  
-  // Check authentication
+
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isAuthenticated === false) {
       router.push('/')
       toast({
         title: "Login required",
@@ -78,8 +74,7 @@ export default function PaymentPage() {
       })
     }
   }, [isAuthenticated, router, toast])
-  
-  // Function to initiate payment
+
   const handleCreatePayment = async () => {
     if (!selectedPlan) {
       toast({
@@ -89,15 +84,12 @@ export default function PaymentPage() {
       })
       return
     }
-    
+
     try {
       setCreatingPayment(true)
       const paymentResponse = await paymentService.createPayment(selectedPlan.id)
-      
-      // Start checking payment status
+
       setCurrentPaymentId(paymentResponse.payment_id)
-      
-      // Redirect to payment page
       window.location.href = paymentResponse.payment_url
     } catch (error: any) {
       console.error("Payment creation failed:", error)
@@ -106,69 +98,56 @@ export default function PaymentPage() {
         description: error.response?.data?.error || "Please try again later",
         variant: "error"
       })
+      setCurrentPaymentId(null)
     } finally {
       setCreatingPayment(false)
     }
   }
-  
-  // Function to check payment status
+
   const checkPaymentStatus = async () => {
-    if (!currentPaymentId) return
-    
+    if (!currentPaymentId || checkingStatus) return
+
     try {
       setCheckingStatus(true)
       const statusResponse = await paymentService.checkPaymentStatus(currentPaymentId)
-      
+
       if (statusResponse.status === 'completed') {
-        // Payment successful
         toast({
           title: "Payment successful!",
-          description: `${statusResponse.credits_purchased} credits have been added to your account`,
-          variant: "success"
+          description: `${statusResponse.credits_purchased} credits added. Redirecting...`,
+          variant: "success",
+          duration: 3000
         })
-        
-        // Stop checking status
+
         if (statusCheckIntervalRef.current) {
           clearInterval(statusCheckIntervalRef.current)
         }
-        
-        // Refresh user profile to get updated credit balance
         await refreshUserProfile()
-        
-        // Redirect to home page after successful payment
-        router.push('/')
-      } else if (statusResponse.status === 'failed') {
-        // Payment failed
+        setTimeout(() => router.push('/'), 1500)
+
+      } else if (statusResponse.status === 'failed' || statusResponse.status === 'cancelled') {
         toast({
-          title: "Payment failed",
-          description: statusResponse.message || "Your payment was not successful",
+          title: `Payment ${statusResponse.status}`,
+          description: statusResponse.message || `Your payment was not successful.`,
           variant: "error"
         })
-        
-        // Stop checking status
         if (statusCheckIntervalRef.current) {
           clearInterval(statusCheckIntervalRef.current)
         }
-        
         setCurrentPaymentId(null)
       }
-      // For 'pending' or 'processing', we continue to wait
     } catch (error) {
       console.error("Failed to check payment status:", error)
     } finally {
       setCheckingStatus(false)
     }
   }
-  
-  // Set up interval to check payment status
+
   useEffect(() => {
     if (currentPaymentId) {
-      // Check immediately
       checkPaymentStatus()
-      
-      // Set up interval to check every 5 seconds
       statusCheckIntervalRef.current = setInterval(checkPaymentStatus, 5000)
-      
+
       return () => {
         if (statusCheckIntervalRef.current) {
           clearInterval(statusCheckIntervalRef.current)
@@ -193,7 +172,7 @@ export default function PaymentPage() {
             {isAuthenticated && user && (
               <div className="text-sm text-ghibli-dark">
                 <span className="font-medium">
-                  {user.first_name ? `${user.first_name} ${user.last_name || ''}` : user.email}
+                  {user.first_name ? `${user.first_name} ${user.last_name || ''}`.trim() : user.email}
                 </span>
                 {user.profile && (
                   <span className="ml-2 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full">
@@ -227,38 +206,51 @@ export default function PaymentPage() {
               <h2 className="text-xl font-playfair text-ghibli-dark mb-4">
                 Choose a Package
               </h2>
-              
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {pricingPlans.map((plan) => (
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                {pricingPlans.map((plan, index) => (
                   <div
                     key={plan.id}
-                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    className={`relative border rounded-lg p-4 cursor-pointer transition-all overflow-visible ${
                       selectedPlan?.id === plan.id
                         ? "border-amber-500 bg-amber-50"
                         : "border-gray-200 hover:border-amber-300"
+                    } ${
+                      pricingPlans.length === 3 && index === 2 ? 'md:col-span-2 md:mx-auto md:w-80' : ''
                     }`}
                     onClick={() => setSelectedPlan(plan)}
                   >
+                    {plan.name === 'Trial Pack' && (
+                      <span className="absolute -bottom-2.5 -right-2.5 bg-red-500 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md z-10">
+                        Ending Soon
+                      </span>
+                    )}
+                    {plan.name === 'Standard' && (
+                      <span className="absolute -top-2.5 -right-2.5 bg-green-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-md z-10">
+                        Most Value
+                      </span>
+                    )}
+
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="text-lg font-medium text-ghibli-dark">
-                        {plan.name} Package
+                        {plan.name}
                       </h3>
                       {selectedPlan?.id === plan.id && (
                         <CheckCircle2 className="h-5 w-5 text-amber-500" />
                       )}
                     </div>
                     <p className="text-3xl font-bold text-ghibli-dark mb-2">
-                      ₹{plan.price_inr}
+                       ₹{plan.price_inr}
                     </p>
                     <p className="text-sm text-ghibli-dark/80">
-                      {plan.credits} image transformations
+                      {plan.credits} image transformation{plan.credits !== 1 ? 's' : ''}
                     </p>
                   </div>
                 ))}
               </div>
-              
+
               <Button
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-lg font-medium"
+                className="w-full flex items-center justify-center py-3 px-6 rounded-lg font-medium transition-colors duration-200 ease-in-out shadow hover:shadow-md focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed bg-amber-500 hover:bg-amber-600 text-white"
                 onClick={handleCreatePayment}
                 disabled={!selectedPlan || creatingPayment}
               >
@@ -275,7 +267,6 @@ export default function PaymentPage() {
                 )}
               </Button>
 
-              {/* Payment Processing Info */}
               {currentPaymentId && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
                   <div className="flex items-start">
@@ -291,7 +282,7 @@ export default function PaymentPage() {
                             Checking payment status...
                           </span>
                         ) : (
-                          "Complete the payment in the browser window that opened."
+                          "Complete the payment in the browser window that opened. We'll check the status automatically."
                         )}
                       </p>
                     </div>
@@ -300,15 +291,13 @@ export default function PaymentPage() {
               )}
             </div>
           )}
-          
-          {/* Information Box */}
+
           <div className="max-w-2xl mx-auto">
             <div className="bg-amber-50 rounded-lg p-4 text-sm text-ghibli-dark/80">
               <p className="font-medium text-ghibli-dark mb-2">Payment Information</p>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Your payment is processed securely by Dodo Payments</li>
-                <li>Credits will be added to your account automatically after payment</li>
-                <li>For any issues, contact support@ghiblit.art</li>
+                <li>Credits will be added to your account automatically after successful payment</li>
               </ul>
             </div>
           </div>

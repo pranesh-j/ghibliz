@@ -6,6 +6,7 @@ class PricingPlan(models.Model):
     credits = models.IntegerField()
     price_usd = models.DecimalField(max_digits=10, decimal_places=2)
     price_inr = models.DecimalField(max_digits=10, decimal_places=2)
+    is_intro_offer = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     dodo_product_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
