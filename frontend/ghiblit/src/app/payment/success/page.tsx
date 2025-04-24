@@ -1,5 +1,3 @@
-// frontend/ghiblit/src/app/payment/success/page.tsx
-
 "use client"
 
 import { useEffect, useState } from "react"
@@ -23,10 +21,8 @@ export default function PaymentSuccessPage() {
 
   useEffect(() => {
     const checkPaymentStatus = async () => {
-      // First refresh the user profile to get updated credit balance
       await refreshUserProfile()
       
-      // Get status directly from URL - this is the key change
       const urlStatus = searchParams?.get('status')
       
       if (urlStatus === 'succeeded') {
@@ -45,7 +41,6 @@ export default function PaymentSuccessPage() {
           variant: "error"
         })
       } else {
-        // No status or unknown status
         setSuccess(false)
         setErrorMsg("Could not verify payment status")
         toast({
@@ -58,7 +53,6 @@ export default function PaymentSuccessPage() {
       setLoading(false)
     }
     
-    // Run once when component mounts
     checkPaymentStatus()
   }, [searchParams, refreshUserProfile, toast])
 

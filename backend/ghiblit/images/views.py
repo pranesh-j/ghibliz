@@ -1,4 +1,3 @@
-# images/views.py
 from rest_framework import status, views, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
@@ -19,7 +18,6 @@ from users.models import UserProfile
 from django.views.decorators.cache import cache_page
 from django.core.cache import cache
 
-# Configure logging
 logger = logging.getLogger(__name__)
 
 class ImageTransformAPIView(views.APIView):

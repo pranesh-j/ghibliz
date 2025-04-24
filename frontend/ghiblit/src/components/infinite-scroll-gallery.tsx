@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import ImageService, { RecentImage } from '@/services/imageService';
 import { Loader2 } from 'lucide-react';
 
-const IMAGE_REFRESH_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+const IMAGE_REFRESH_INTERVAL = 6 * 60 * 60 * 1000;
 
 export default function InfiniteScrollGallery() {
   const [images, setImages] = useState<RecentImage[]>([]);
@@ -14,7 +14,6 @@ export default function InfiniteScrollGallery() {
   const lowerRowRef = useRef<HTMLDivElement>(null);
   const lastRefreshRef = useRef<number>(Date.now());
 
-  // Use intersection observer to reduce animations when not visible
   useEffect(() => {
     if (!containerRef.current) return;
     
@@ -23,7 +22,6 @@ export default function InfiniteScrollGallery() {
         const newVisibility = entries[0].isIntersecting;
         setIsVisible(newVisibility);
         
-        // Directly manage animation state for better performance
         if (upperRowRef.current && lowerRowRef.current) {
           const playState = newVisibility ? 'running' : 'paused';
           upperRowRef.current.style.animationPlayState = playState;
@@ -40,8 +38,6 @@ export default function InfiniteScrollGallery() {
   const fetchImages = async () => {
     try {
       setLoading(true);
-      
-      // Fetch 12 images for the gallery
       const data = await ImageService.getRecentImages(12);
       
       if (data.length === 0) {
@@ -60,11 +56,9 @@ export default function InfiniteScrollGallery() {
           { id: 12, original: "/api/placeholder/400/300", processed: "/api/placeholder/400/300" },
         ]);
       } else {
-        // Store the fetched images
         setImages(data);
       }
       
-      // Update last refresh timestamp
       lastRefreshRef.current = Date.now();
     } catch (error) {
       console.error('Error fetching images:', error);
@@ -73,23 +67,20 @@ export default function InfiniteScrollGallery() {
     }
   };
 
-  // Effect to fetch images initially and set up periodic refresh
   useEffect(() => {
     fetchImages();
     
-    // Set up periodic refresh every 6 hours
     const periodicRefresh = setInterval(() => {
       const now = Date.now();
       if (now - lastRefreshRef.current >= IMAGE_REFRESH_INTERVAL) {
         console.log('Scheduled gallery refresh');
         fetchImages();
       }
-    }, 60000); // Check every minute
+    }, 60000);
     
     return () => clearInterval(periodicRefresh);
   }, []);
 
-  // Add custom styles for optimized hover effects
   const hoverStyles = `
     @media (prefers-reduced-motion: no-preference) {
       .gallery-item {
@@ -124,11 +115,8 @@ export default function InfiniteScrollGallery() {
     );
   }
 
-  // Split images into two rows of 6 each
   const firstRowImages = images.slice(0, 6);
   const secondRowImages = images.slice(6, 12);
-  
-  // For animation, we duplicate each set
   const duplicatedFirstRow = [...firstRowImages, ...firstRowImages];
   const duplicatedSecondRow = [...secondRowImages, ...secondRowImages];
 

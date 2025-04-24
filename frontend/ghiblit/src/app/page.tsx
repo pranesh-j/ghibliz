@@ -15,10 +15,8 @@ import ImageService, { RecentImage } from "@/services/imageService"
 import { useRouter } from "next/navigation"
 import { Footer } from "@/components/footer"
 
-// Lazy load non-critical components
 import { StylePresets } from '@/components/style-presets'
 
-// Memoize static components
 const MemoizedFooter = memo(Footer)
 const MemoizedCloudBackground = memo(CloudBackground)
 
@@ -48,7 +46,6 @@ function HomeContent() {
     router.prefetch('/payment');
   }, [router]);
 
-  // Function to close the image viewer
   const handleCloseViewer = () => {
     setViewingImage(null);
     setIsFullView(false);
@@ -71,23 +68,17 @@ function HomeContent() {
     }
   };
 
-  // Function to handle image loading errors in the gallery
   const handleImageError = useCallback(async (index: number, rowType: 'upper' | 'lower') => {
     console.log(`Image at index ${index} in ${rowType} row failed to load, attempting to fetch replacement`);
     
     try {
-      // Determine which array index we need to update in recentWorks
       const actualIndex = rowType === 'upper' ? index % 6 : (index % 6) + 6;
       
-      // Make a copy of the current recentWorks array
       const updatedWorks = [...recentWorks];
       
-      // Try to fetch a replacement image from the API
       try {
-        // Request one more image than we have
         const newImages = await ImageService.getRecentImages(13);
         
-        // Find images that aren't already in our gallery
         const existingIds = new Set(recentWorks.map(img => img.id));
         const newImage = newImages.find(img => !existingIds.has(img.id));
         
@@ -101,7 +92,6 @@ function HomeContent() {
         console.error("Failed to fetch replacement image:", error);
       }
       
-      // If we couldn't get a new image, make sure we at least have a placeholder
       updatedWorks[actualIndex] = {
         ...updatedWorks[actualIndex],
         original: "/api/placeholder/400/300",
@@ -114,7 +104,6 @@ function HomeContent() {
     }
   }, [recentWorks]);
 
-  // Fetch initial gallery images
   useEffect(() => {
     const fetchRecentWorks = async () => {
       setLoadingRecentWorks(true);
@@ -124,7 +113,6 @@ function HomeContent() {
         if (data.length > 0) {
           setRecentWorks(data);
         } else {
-          // Fallback if no images
           setRecentWorks(Array(12).fill(null).map((_, index) => ({ 
             id: index + 1, 
             original: "/api/placeholder/400/300", 
@@ -138,7 +126,6 @@ function HomeContent() {
           description: "We couldn't load recent creations. Please try again later.",
           variant: "error"
         });
-        // Fallback placeholders
         setRecentWorks(Array(12).fill(null).map((_, index) => ({ 
           id: index + 1, 
           original: "/api/placeholder/400/300", 
@@ -151,7 +138,7 @@ function HomeContent() {
     
     fetchRecentWorks();
     
-    // Set up refresh every 6 hours
+
     const refreshInterval = setInterval(() => {
       console.log("Refreshing gallery images");
       fetchRecentWorks();
@@ -682,7 +669,7 @@ function HomeContent() {
               </div>
             ) : (
               <>
-                {/* First Row - Original Images */}
+
                 <div className="relative w-full overflow-hidden mb-3 sm:mb-4">
                   <div className="absolute left-0 top-0 bottom-0 w-8 sm:w-12 z-10 bg-gradient-to-r from-amber-50/70 to-transparent pointer-events-none" />
                   <motion.div 
@@ -697,7 +684,7 @@ function HomeContent() {
                       transform: "translateZ(0)"
                     }}
                   >
-                    {/* First 6 images + duplicates for continuous scrolling */}
+
                     {[...recentWorks.slice(0, 6), ...recentWorks.slice(0, 6)].map((item, index) => (
                       <div 
                         key={`top-${item.id}-${index}`} 
@@ -710,9 +697,9 @@ function HomeContent() {
                             alt={`Original ${item.id}`} 
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              // Set placeholder immediately
+
                               e.currentTarget.src = "/api/placeholder/400/300";
-                              // Try to fetch a replacement
+
                               handleImageError(index, 'upper');
                             }}
                             loading="lazy"
@@ -808,7 +795,6 @@ function HomeContent() {
   )
 }
 
-// Use React.memo for the entire component
 export default memo(function Home() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
