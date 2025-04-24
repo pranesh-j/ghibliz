@@ -2,7 +2,7 @@
 
 > Transform your photos into beautiful artwork with AI
 
-![Ghiblit.art Screenshot](./screenshot.png)
+![Ghiblit.art Screenshot](./docs/images/screenshot.png)
 
 ## About Ghiblit
 
