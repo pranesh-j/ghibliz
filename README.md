@@ -6,13 +6,17 @@
 
 ## About Ghiblit
 
-Ghiblit.art is a web app that transforms ordinary photos into stunning artwork inspired by various artistic styles including Ghibli, One Piece, Cyberpunk, Solo Leveling, Shinchan, Pixar, Dragon Ball, Manga, and Minecraft. Simply upload your image, select a style.
+Ghiblit.art is a web app that transforms ordinary photos into stunning artwork inspired by various artistic styles. Upload any image and watch as AI transforms it into beautiful art in styles like Studio Ghibli, One Piece, Cyberpunk, and more. The application provides an intuitive interface for both creating and managing your artistic transformations.
+
 ## Features
 
 - **Multiple Art Styles**: Choose from various artistic styles including Ghibli, One Piece, Cyberpunk, Solo Leveling, Shinchan, Pixar, Dragon Ball, Manga, and Minecraft
 - **Instant Transformation**: Upload and transform your images in seconds
 - **User Accounts**: Google account integration for seamless login and registration
-- **Credit System**: Affordable credit system
+- **Credit System**: Affordable credit system for transformations
+- **Gallery View**: Browse through recent transformations for inspiration
+- **Download & Share**: Easily download and share your transformed images
+- **Mobile Responsive**: Works perfectly on desktop and mobile devices
 
 ## Tech Stack
 
@@ -25,7 +29,7 @@ Ghiblit.art is a web app that transforms ordinary photos into stunning artwork i
 
 ### Backend
 - **Framework**: Django/Django REST Framework
-- **Database**: PostgreSQL (supabase)
+- **Database**: PostgreSQL (Supabase)
 - **Storage**: Supabase Storage
 - **Authentication**: JWT (Simple JWT)
 - **Image Processing**: OpenAI API, PIL (Python Imaging Library)
@@ -56,7 +60,7 @@ source env/bin/activate  # On Windows, use `env\Scripts\activate`
 pip install -r requirements.txt
 
 # Create a .env file with necessary environment variables
-# See .env.example for required variables
+# See Environment Variables section below
 
 # Run migrations
 python manage.py migrate
@@ -78,7 +82,7 @@ cd ../../frontend/ghiblit
 npm install  # or yarn install
 
 # Create a .env.local file with necessary environment variables
-# See .env.example for required variables
+# See Environment Variables section below
 
 # Run the development server
 npm run dev  # or yarn dev
@@ -94,6 +98,8 @@ The application is deployed with:
 
 ## Environment Variables
 
+For local development, create these `.env` files:
+
 ### Backend (.env)
 ```
 SECRET_KEY=your_django_secret_key
@@ -101,16 +107,6 @@ DEBUG=True
 ALLOWED_HOSTS=localhost,127.0.0.1
 OPENAI_API_KEY=your_openai_api_key
 GOOGLE_CLIENT_ID=your_google_client_id
-DATABASE_URL = your_supabase_url
-SUPABASE_PROJECT_ID=your_supabase_project_id
-SUPABASE_STORAGE_KEY=your_supabase_storage_key
-SUPABASE_STORAGE_SECRET=your_supabase_storage_secret
-SUPABASE_STORAGE_BUCKET=your_supabase_storage_bucket
-DODO_API_KEY=your_dodo_api_key
-DODO_WEBHOOK_SECRET=your_dodo_webhook_secret
-DODO_TEST_MODE=True
-DODO_SUCCESS_URL=http://localhost:3000/payment/success
-DODO_FAILURE_URL=http://localhost:3000/payment/failed
 ```
 
 ### Frontend (.env.local)
@@ -118,6 +114,8 @@ DODO_FAILURE_URL=http://localhost:3000/payment/failed
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_google_client_id
 ```
+
+> **Note:** The application uses additional services in production (database as Postgres instanace from Supabase, and dodo payments for payment gatway), but for local development, Django's default SQLite database and file storage are sufficient to get started..
 
 ## Key Directories
 
