@@ -6,6 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from .serializers import RegisterSerializer, UserSerializer
 from django.core.cache import cache
+from payments.utils import get_user_country
 
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
@@ -42,6 +43,19 @@ class UserProfileView(generics.RetrieveAPIView):
         cache.set(cache_key, user, 60 * 10)
         
         return user
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance)
+        response_data = serializer.data
+        
+        # Get user country using the imported function
+        user_country = get_user_country(request)
+        
+        # Add the region directly to the response
+        response_data['region'] = user_country or 'GLOBAL'
+        
+        return Response(response_data)
 
 
 class LogoutView(APIView):

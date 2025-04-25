@@ -26,6 +26,7 @@ interface UserProfileResponse {
         credit_balance: number;
         free_transform_used: boolean;
     };
+    region: string;
 }
 
 const authService = {

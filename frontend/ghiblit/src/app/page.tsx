@@ -172,17 +172,26 @@ function HomeContent() {
       return
     }
 
-     if (user && user.profile.credit_balance <= 0) {
-       toast({
-         title: "No Credits",
-         description: "Why pay $20 to ChatGPT when you can do the same for less than $2, checkout the pricing",
-         variant: "warning",
-         duration: 10000,
-         action: ( <Button variant="secondary" size="sm" onClick={handleBuyCredits}> Buy Credits </Button> ),
-       })
-       if (fileInputRef.current) fileInputRef.current.value = ""
-       return
-     }
+    if (user && user.profile.credit_balance <= 0) {
+      const region = user.region || 'GLOBAL';
+      const isIndia = region === 'IN';
+      
+      toast({
+        title: "No Credits",
+        description: isIndia 
+          ? "Get started with just ₹30! Pay easily with UPI."
+          : "Why pay $20 to ChatGPT when you can do the same for only $1? Check out our pricing!",
+        variant: "warning",
+        duration: 10000,
+        action: (
+          <Button variant="secondary" size="sm" onClick={handleBuyCredits}>
+            Buy Credits
+          </Button>
+        ),
+      })
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      return
+    }
 
     setProcessedImage(null)
     setImageData(null)
@@ -764,8 +773,21 @@ function HomeContent() {
           >
             <button onClick={() => setShowPromoPopup(false)} className="absolute top-1 right-1 text-gray-400 hover:text-gray-700 p-1 rounded-full" aria-label="Close promotion"> <X size={16} /> </button>
 
-            <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT 20$ when you can do it for 2$?</p>
-            <p className="text-xs text-ghibli-dark/70 mb-3">Get 3 image transformations for just $2!</p>
+            {user?.region === 'IN' ? (
+              <>
+                <p className="text-sm font-medium text-ghibli-dark mb-2">Transform More Images!</p>
+                <p className="text-xs text-ghibli-dark/70 mb-2">Starting at just ₹30 with UPI payment option.</p>
+                <div className="mb-3 flex items-center bg-blue-50 rounded p-1.5 text-xs">
+                  <span className="bg-blue-100 text-blue-700 font-medium px-1.5 py-0.5 rounded mr-1.5">UPI</span>
+                  <span className="text-blue-600">Quick and secure payments</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT $20?</p>
+                <p className="text-xs text-ghibli-dark/70 mb-3">Get 10 image transformations for just $1!</p>
+              </>
+            )}
 
             <button
               onClick={handleBuyCredits}
@@ -778,7 +800,7 @@ function HomeContent() {
                   <span>Loading...</span>
                 </>
               ) : (
-                "Buy Credits"
+                user?.region === 'IN' ? "Get Credits with UPI" : "Buy Credits"
               )}
             </button>
           </motion.div>
