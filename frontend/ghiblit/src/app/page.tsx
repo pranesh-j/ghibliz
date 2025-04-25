@@ -785,7 +785,7 @@ function HomeContent() {
             ) : (
               <>
                 <p className="text-sm font-medium text-ghibli-dark mb-2">Why pay ChatGPT $20?</p>
-                <p className="text-xs text-ghibli-dark/70 mb-3">Get 10 image transformations for just $1!</p>
+                <p className="text-xs text-ghibli-dark/70 mb-3">Get 2 image transformations for just $1!</p>
               </>
             )}
 

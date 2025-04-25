@@ -279,18 +279,12 @@ function PoliciesContent() {
                 <h3 className="font-medium text-base mb-2">Non-Refundable Scenarios</h3>
                 <p>We will not issue refunds in the following cases:</p>
                 <ul className="list-disc pl-5 space-y-1 mt-2">
+                  <li><strong>Partial Credits Usage:</strong> Partial Credit usage cannot be refunded.</li>
                   <li><strong>Used Credits:</strong> Once credits have been used to transform images, they cannot be refunded.</li>
                   <li><strong>Image Quality Dissatisfaction:</strong> Due to the subjective nature of AI image transformations, we cannot offer refunds based on dissatisfaction with the artistic quality of transformed images.</li>
                   <li><strong>Improper Use:</strong> If you violated our Terms of Service.</li>
                   <li><strong>Change of Mind:</strong> Simple change of mind or no longer needing the service after using credits.</li>
                 </ul>
-              </section>
-
-              <section>
-                <h3 className="font-medium text-base mb-2">Partial Credits Usage</h3>
-                <p>
-                  If you have used some, but not all of your credits, we may provide a partial refund for the unused portion at our discretion.
-                </p>
               </section>
 
               <section>
