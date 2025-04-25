@@ -10,9 +10,12 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-temporary-key-for-development')
+SECRET_KEY = os.getenv('SECRET_KEY')
+if not SECRET_KEY:
+    raise Exception("SECRET_KEY env variable is required")
 
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+
+DEBUG = os.getenv('DEBUG', 'False') == 'True' #defaulting to False change it to True during dev
 
 ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
@@ -65,7 +68,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-SQLITE_DB_PATH = BASE_DIR / 'db.sqlite3'
+SQLITE_DB_PATH = BASE_DIR / 'db.sqlite3' # Default SQLite path for local development
 
 DATABASES = {
     'default': dj_database_url.config(
@@ -85,6 +88,7 @@ STORAGES = {
 
 DEFAULT_FILE_STORAGE = 'config.storage.GeneratedImagesStorage'
 
+# Empty defaults allows local development without Supabase
 AWS_ACCESS_KEY_ID = config('SUPABASE_STORAGE_KEY', default='')
 AWS_SECRET_ACCESS_KEY = config('SUPABASE_STORAGE_SECRET', default='')
 AWS_STORAGE_BUCKET_NAME = 'ghiblits'
