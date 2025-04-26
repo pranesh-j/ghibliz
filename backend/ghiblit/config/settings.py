@@ -192,5 +192,5 @@ DODO_WEBHOOK_SECRET = os.environ.get('DODO_WEBHOOK_SECRET', '')
 DODO_TEST_MODE = os.environ.get('DODO_TEST_MODE', 'True') == 'True'
 
 # URLs for Dodo
-DODO_SUCCESS_URL = os.environ.get('DODO_SUCCESS_URL', 'https://ghiblit.art/payment/success')
-DODO_FAILURE_URL = os.environ.get('DODO_FAILURE_URL', 'https://ghiblit.art/payment/failed')
+DODO_SUCCESS_URL = os.environ.get('DODO_SUCCESS_URL', '')
+DODO_FAILURE_URL = os.environ.get('DODO_FAILURE_URL', '')
