@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Ghibli theme colors as direct hex values */
+  --ghibli-blue: #5EBFE2;
+  --ghibli-green: #59A459;
+  --ghibli-cream: #FFF6C8;
+  --ghibli-dark: #5A4A3F;
+}
+
+/* Font family setup */
+.font-playfair {
+  font-family: var(--font-playfair), serif;
+}
+
+/* Custom Ghibli theme utility classes with direct values */
+.bg-ghibli-blue {
+  background-color: #5EBFE2;
+}
+
+.bg-ghibli-green {
+  background-color: #59A459;
+}
+
+.bg-ghibli-cream {
+  background-color: #FFF6C8;
+}
+
+.bg-ghibli-dark {
+  background-color: #5A4A3F;
+}
+
+.text-ghibli-blue {
+  color: #5EBFE2;
+}
+
+.text-ghibli-green {
+  color: #59A459;
+}
+
+.text-ghibli-cream {
+  color: #FFF6C8;
+}
+
+.text-ghibli-dark {
+  color: #5A4A3F;
+}
+
+/* Additional styling */
+.transform-title {
+  font-size: 5rem;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-playfair), serif;
+  color: #5A4A3F;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marquee-reverse {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 45s linear infinite;
+  min-width: 200%;
+}
+.animate-marquee-reverse {
+  animation: marquee-reverse 45s linear infinite;
+  min-width: 200%;
+}
+
+/* Add this to globals.css */
+
+/* Custom scrollbar styling */
+/* For Webkit browsers (Chrome, Safari, newer Edge) */
+::-webkit-scrollbar {
+  width: 8px; /* Thinner scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(176, 224, 230, 0.3); /* Light blue from your theme - transparent */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(245, 158, 11, 0.5); /* Amber color from your theme - semi-transparent */
+  border-radius: 10px;
+  border: 2px solid rgba(176, 224, 230, 0.1); /* Light border */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(245, 158, 11, 0.7); /* Darker on hover */
+}
+
+/* For Firefox */
+html {
+  scrollbar-width: thin; /* "thin", "auto", or "none" */
+  scrollbar-color: rgba(245, 158, 11, 0.5) rgba(176, 224, 230, 0.3); /* thumb and track color */
+}
+
+html, body {
+  overflow-x: hidden;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+/* Keep canvas from causing overflow */
+canvas {
+  display: block;
+}
+
+/* Layout content fade-in */
+.content-container {
+  transition: opacity 0.8s ease-in-out;
+  will-change: opacity;
+}
+
+.initial-load * {
+  transition: none !important;
+}
+
+/* Gallery card hover animations */
+@media (prefers-reduced-motion: no-preference) {
+  .gallery-item {
+    transition: transform 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .gallery-item:hover {
+    transform: scale(1.05);
+    border-color: #FFF6C8;
+    box-shadow: 0 4px 12px rgba(90, 74, 63, 0.15);
+    z-index: 10;
+  }
+}
+
+/* Style preset card animations */
+@media (prefers-reduced-motion: no-preference) {
+  .style-item {
+    transition: background-color 0.2s ease;
+  }
+  .style-item-image {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .style-item:hover .style-item-image {
+    border-color: #FDB81E;
+    box-shadow: 0 0 0 2px rgba(253, 184, 30, 0.2);
+  }
+  .style-item.selected {
+    background-color: rgba(251, 191, 36, 0.2);
+  }
+  .style-item.selected .style-item-image {
+    border-color: #FDB81E;
+    box-shadow: 0 0 0 3px rgba(253, 184, 30, 0.3);
+  }
+}
